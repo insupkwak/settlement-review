@@ -282,7 +282,8 @@ async function unzipPdfs(file) {
   const pdfs = [];
   const entries = Object.values(zip.files).filter(f => !f.dir && /\.pdf$/i.test(f.name));
   for (const e of entries) {
-    const blob = await e.async('blob');
+    const ab = await e.async('arraybuffer');
+    const blob = new Blob([ab], { type: 'application/pdf' });
     pdfs.push({ name: e.name, blob });
   }
   return pdfs;
@@ -396,13 +397,41 @@ function scoreFor(row, pdf) {
     if (!amtNameHit && containsAmount(pdf.name, v)) amtNameHit = true;
     if (!amtTextHit && containsAmount(text, v)) amtTextHit = true;
   }
-  // 추출 금액 비교 — 정확 일치만 (Gemini가 라인아이템·세금 등 잡것까지 추출하므로
-  // 중복 식별엔 사용 X. 점수 가산에만 사용.)
-  if ((ex.amounts || []).some(a => amountEquals(a.value, expected))) amtExHit = true;
+  // 추출 금액 — 정확 일치 단건
+  const exAmts = ex.amounts || [];
+  if (exAmts.some(a => amountEquals(a.value, expected))) amtExHit = true;
 
-  if (amtNameHit) { score += 0.8; reasons.push('파일명에 금액 ' + expected + ' 포함'); }
-  if (amtExHit)   { score += 0.6; reasons.push('PDF 추출 금액에 정확 일치'); }
-  else if (amtTextHit) { score += 0.5; reasons.push('PDF 본문에 금액 ' + expected + ' 포함'); }
+  // [1-a] 하이라이트 합산 매칭 — 관리사가 PDF에 2개 이상 부분금액을 표시한 경우
+  // is_marked=true인 금액들의 부분집합 중 합이 expected와 일치하는 것이 있는지 탐색
+  let markedSumHit = false, markedSumDetail = null;
+  const markedAmts = exAmts.filter(a => a.is_marked && typeof a.value === 'number' && !isNaN(a.value));
+  if (markedAmts.length >= 2) {
+    // 부분집합 합산 탐색 (최대 8건, 2^8=256 조합)
+    const arr = markedAmts.slice(0, 8);
+    const N = arr.length;
+    outer: for (let mask = 3; mask < (1<<N); mask++) {
+      if (!(mask & (mask-1))) continue; // 단일 원소 스킵 (이미 amtExHit가 처리)
+      let s = 0, parts = [];
+      for (let k = 0; k < N; k++) {
+        if (mask & (1<<k)) { s += arr[k].value; parts.push(arr[k]); }
+      }
+      if (parts.length >= 2 && amountEquals(s, expected)) {
+        markedSumHit = true;
+        markedSumDetail = parts.map(p => p.value);
+        break outer;
+      }
+    }
+  }
+
+  // 작은 정수 금액(<1000)은 본문 substring 매칭 신뢰도 낮음 (페이지번호·코드 등과 혼동 위험)
+  // 정수 + |amt|<1000 인 경우 본문 단독 히트는 점수에서 제외 (파일명·추출·합산 매칭 필수)
+  const isSmallInteger = Math.abs(expected) < 1000 && Math.abs(expected - Math.round(expected)) < 0.005;
+
+  if (amtNameHit)      { score += 0.8; reasons.push('파일명에 금액 ' + expected + ' 포함'); }
+  if (markedSumHit)    { score += 0.9; reasons.push(`PDF 하이라이트 합산 일치 (${markedSumDetail.join(' + ')} = ${expected})`); }
+  else if (amtExHit)   { score += 0.6; reasons.push('PDF 추출 금액에 정확 일치'); }
+  else if (amtTextHit && !isSmallInteger) { score += 0.5; reasons.push('PDF 본문에 금액 ' + expected + ' 포함'); }
+  else if (amtTextHit && isSmallInteger)  { score += 0.15; reasons.push('PDF 본문에 ' + expected + ' 등장(약한 신호: 소액 정수)'); }
 
   // [2] 인보이스 번호 토큰 매칭
   const invTokens = invoiceTokens(row.invoice);
@@ -679,7 +708,7 @@ function renderResult(findings, pdfs) {
               <th style="min-width:180px;">Vendor</th>
               <th style="text-align:right;width:120px;">정산서 금액</th>
               <th style="text-align:right;width:60px;">CUR</th>
-              <th style="width:90px;">판정</th>
+              <th style="width:90px;">금액</th>
               <th style="min-width:180px;">옵션 검증</th>
               <th style="min-width:260px;">증빙 PDF / 매칭 근거</th>
               <th style="min-width:200px;">중복 후보</th>
