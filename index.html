@@ -310,17 +310,34 @@ function amountEquals(a, b) {
   return diff / Math.max(Math.abs(a), Math.abs(b), 1) < 0.005;
 }
 
-// 금액 문자열 변형들 — 자료 분석 기반: "484", "80,064", "86,921.83" 등
+// 금액 문자열 변형들 — 정수면 정수 표기, 소수면 소수 표기만 (반올림 변형 X)
 function amountVariants(amt) {
-  const ints = Math.round(amt);
   const variants = new Set();
-  variants.add(String(ints));
-  variants.add(ints.toLocaleString('en-US'));
-  if (Math.abs(amt - ints) > 0.001) {
+  const hasDecimal = Math.abs(amt - Math.round(amt)) > 0.005;
+  if (!hasDecimal) {
+    const ints = Math.round(amt);
+    variants.add(String(ints));
+    variants.add(ints.toLocaleString('en-US'));
+    // 천단위 점 구분(유럽식): 86.640 형식도 포함
+    if (ints >= 1000) {
+      const eu = String(ints).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      if (eu !== String(ints)) variants.add(eu);
+    }
+  } else {
     variants.add(amt.toFixed(2));
     variants.add(Number(amt).toLocaleString('en-US', { minimumFractionDigits: 2 }));
   }
   return Array.from(variants).filter(v => v.length >= 2);
+}
+
+// 단어 경계 인식 substring 매칭 — 숫자 양옆이 다른 숫자면 매칭 안함
+// "130" → "1303" / "0130" / "5130"엔 매칭 X, "130 USD" / "-130.pdf" / "$130"엔 매칭 O
+function containsAmount(haystack, needle) {
+  if (!haystack || !needle) return false;
+  const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // 숫자/콤마/점 시퀀스의 경계 — 양옆이 0-9 또는 ,/. 이면 거부
+  const re = new RegExp(`(?<![0-9])${esc}(?![0-9])`);
+  return re.test(haystack);
 }
 
 // 인보이스 토큰화: "24.09.03331" → ["24","09","03331","240903331"], "DFC3-RLDN-808" → ["DFC3","RLDN","808"]
@@ -348,19 +365,21 @@ function scoreFor(row, pdf) {
   const textFlat = normFlat(text);
   const ex = pdf.extracted || {};
 
-  // [1] 금액 매칭 — 가장 강한 신호
+  // [1] 금액 매칭 — 가장 강한 신호 (단어 경계 인식)
   const expected = row.debit;
   const variants = amountVariants(expected);
   let amtNameHit = false, amtTextHit = false, amtExHit = false;
   for (const v of variants) {
-    if (!amtNameHit && pdf.name.includes(v)) { amtNameHit = true; }
-    if (!amtTextHit && text.includes(v)) { amtTextHit = true; }
+    if (!amtNameHit && containsAmount(pdf.name, v)) amtNameHit = true;
+    if (!amtTextHit && containsAmount(text, v)) amtTextHit = true;
   }
+  // 추출 금액 비교 — 정확 일치만 (Gemini가 라인아이템·세금 등 잡것까지 추출하므로
+  // 중복 식별엔 사용 X. 점수 가산에만 사용.)
   if ((ex.amounts || []).some(a => amountEquals(a.value, expected))) amtExHit = true;
 
-  if (amtNameHit) { score += 0.8; reasons.push('파일명에 금액 ' + Math.round(expected) + ' 포함'); }
+  if (amtNameHit) { score += 0.8; reasons.push('파일명에 금액 ' + expected + ' 포함'); }
   if (amtExHit)   { score += 0.6; reasons.push('PDF 추출 금액에 정확 일치'); }
-  else if (amtTextHit) { score += 0.5; reasons.push('PDF 본문에 금액 ' + Math.round(expected) + ' 포함'); }
+  else if (amtTextHit) { score += 0.5; reasons.push('PDF 본문에 금액 ' + expected + ' 포함'); }
 
   // [2] 인보이스 번호 토큰 매칭
   const invTokens = invoiceTokens(row.invoice);
@@ -460,10 +479,14 @@ function findPdfForRow(row, pdfs) {
   const best = scored[0];
   if (!best || best.score < 0.5) return null; // 최소 신뢰도
 
-  // 금액으로 일치하는 PDF들을 중복 후보로 식별 (파일명/추출/본문 중 어느 하나라도)
-  const sameAmtCandidates = scored.filter(s =>
-    s.idx !== best.idx && (s.amtNameHit || s.amtExHit || s.amtTextHit)
-  );
+  // 중복 후보: 다른 PDF인데도 자체 점수가 임계값 이상이고,
+  // **파일명에 금액**이 있거나 (가장 강한 신호) **본문+추출**이 모두 일치하는 경우만 중복으로 본다.
+  // 단순히 본문 어딘가에 숫자가 등장하거나 추출 금액 중 하나가 우연히 같은 건 제외.
+  const sameAmtCandidates = scored.filter(s => {
+    if (s.idx === best.idx) return false;
+    if (s.score < 0.5) return false;
+    return s.amtNameHit || (s.amtExHit && s.amtTextHit);
+  });
 
   return {
     ...best.pdf,
