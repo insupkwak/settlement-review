@@ -105,6 +105,12 @@ input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);}
 .rT-CURRENCY_DIFF{background:rgba(168,85,247,.18);color:#d8b4fe;}
 .rT-NO_AMOUNT_FOUND{background:rgba(245,158,11,.18);color:#fcd34d;}
 .rT-PARTIAL_OK{background:rgba(34,197,94,.18);color:#86efac;}
+.optWrap{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;}
+.optTag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;}
+.optTag.ok{background:rgba(34,197,94,.15);color:#86efac;}
+.optTag.err{background:rgba(239,68,68,.15);color:#fca5a5;}
+.optTag.muted{background:rgba(148,163,184,.12);color:#94a3b8;}
+.dupHtml{margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#fde68a;font-size:.78rem;line-height:1.6;}
 details.adv{margin-top:6px;font-size:.82rem;}
 details.adv summary{cursor:pointer;color:var(--accent2);font-weight:600;}
 details.adv .body{margin-top:6px;background:#0b1220;padding:8px 10px;border-radius:6px;color:var(--muted);font-family:Consolas,monospace;font-size:.78rem;white-space:pre-wrap;max-height:200px;overflow:auto;}
@@ -297,82 +303,84 @@ function normFlat(s) {
   return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 }
 
-// 정산서 행 ↔ 추출된 PDF 청구서 구조의 내용 기반 점수
-function scoreByContent(row, pdf) {
-  const ex = pdf.extracted || {};
-  const out = { score: 0, reasons: [] };
-
-  // 1) 인보이스 번호 (구조화된 invoice_numbers 배열과 비교)
-  if (row.invoice && (ex.invoice_numbers || []).length) {
-    const rowInv = normFlat(row.invoice);
-    const rowDigits = rowInv.replace(/\D/g, '');
-    let best = null;
-    for (const inv of ex.invoice_numbers) {
-      const recInv = normFlat(inv);
-      if (!recInv) continue;
-      if (rowInv === recInv) { best = { v: 1.0, m: '인보이스 번호 정확 일치(' + inv + ')' }; break; }
-      if (rowInv.includes(recInv) || recInv.includes(rowInv)) {
-        if (!best || best.v < 0.85) best = { v: 0.85, m: '인보이스 번호 부분 일치(' + inv + ')' };
-      } else if (rowDigits.length >= 4) {
-        const recDigits = recInv.replace(/\D/g, '');
-        const tail = rowDigits.slice(-Math.min(6, rowDigits.length));
-        if (recDigits.includes(tail) || rowDigits.includes(recDigits.slice(-Math.min(6, recDigits.length)))) {
-          if (!best || best.v < 0.55) best = { v: 0.55, m: '인보이스 번호 끝자리 일치(' + tail + ' ↔ ' + inv + ')' };
-        }
-      }
-    }
-    if (best) { out.score += best.v; out.reasons.push(best.m); }
-  }
-
-  // 2) 벤더명 토큰 매칭
-  if (row.vendor && (ex.vendor_names || []).length) {
-    const rowTokens = normTokens(row.vendor);
-    let bestRatio = 0, bestName = '', bestHits = [];
-    for (const vn of ex.vendor_names) {
-      const recTokens = normTokens(vn);
-      const hits = rowTokens.filter(t => recTokens.some(r => r.includes(t) || t.includes(r)));
-      const ratio = rowTokens.length ? hits.length / rowTokens.length : 0;
-      if (ratio > bestRatio) { bestRatio = ratio; bestName = vn; bestHits = hits; }
-    }
-    if (bestRatio > 0) {
-      out.score += 0.5 * bestRatio;
-      out.reasons.push(`벤더명 ${bestHits.length}/${rowTokens.length} 토큰 일치(${bestHits.slice(0,3).join(', ')} ↔ ${bestName})`);
-    }
-  }
-
-  // 3) 금액 매칭 (구조화된 amounts에서)
-  const expected = row.localAmt ?? row.debit;
-  if (expected && (ex.amounts || []).length) {
-    let bestDiff = Infinity, bestAmt = null;
-    for (const a of ex.amounts) {
-      if (a.value == null || isNaN(a.value)) continue;
-      const diff = Math.abs(a.value - expected) / Math.max(Math.abs(expected), 1);
-      if (diff < bestDiff) { bestDiff = diff; bestAmt = a; }
-    }
-    if (bestAmt) {
-      if (bestDiff < 0.001) { out.score += 0.5; out.reasons.push(`금액 정확 일치(${bestAmt.value} ${bestAmt.currency||''}, ${bestAmt.label||''})`); }
-      else if (bestDiff < 0.05) { out.score += 0.3; out.reasons.push(`금액 근사(${bestAmt.value} ${bestAmt.currency||''}, 차 ${(bestDiff*100).toFixed(1)}%)`); }
-      else if (bestDiff < 0.30) { out.score += 0.1; out.reasons.push(`금액 일부 근접(${bestAmt.value}, 차 ${(bestDiff*100).toFixed(0)}%)`); }
-    }
-  }
-
-  // 4) 통화 일치
-  if (row.currency && (ex.amounts || []).length) {
-    const cur = row.currency.toUpperCase();
-    if (ex.amounts.some(a => a.currency && a.currency.toUpperCase() === cur)) {
-      out.score += 0.15; out.reasons.push('통화 ' + cur + ' 일치');
-    }
-  }
-  return out;
+// 금액 동등 여부 (반올림·소수 오차 허용)
+function amountEquals(a, b) {
+  if (a == null || b == null) return false;
+  const diff = Math.abs(a - b);
+  if (diff < 0.01) return true;
+  return diff / Math.max(Math.abs(a), Math.abs(b), 1) < 0.005; // 0.5% 이내
 }
 
+// PDF 추출 결과에서 정산서 금액과 같은 금액이 있는지
+function pdfHasAmount(pdf, expected) {
+  const amts = (pdf.extracted?.amounts) || [];
+  return amts.some(a => amountEquals(a.value, expected));
+}
+
+// 인보이스 번호 일치 여부 (yes/no/null)
+function invoiceMatched(row, pdf) {
+  if (!row.invoice) return null;
+  const ex = pdf.extracted?.invoice_numbers || [];
+  if (!ex.length) return false;
+  const rowInv = normFlat(row.invoice);
+  const rowDigits = rowInv.replace(/\D/g, '');
+  for (const inv of ex) {
+    const recInv = normFlat(inv);
+    if (!recInv) continue;
+    if (rowInv === recInv) return true;
+    if (rowInv.includes(recInv) || recInv.includes(rowInv)) return true;
+    if (rowDigits.length >= 4) {
+      const recDigits = recInv.replace(/\D/g, '');
+      const tail = rowDigits.slice(-Math.min(6, rowDigits.length));
+      if (recDigits.endsWith(tail)) return true;
+    }
+  }
+  return false;
+}
+
+// 벤더명 일치 여부 (yes/no/null)
+function vendorMatched(row, pdf) {
+  if (!row.vendor) return null;
+  const ex = pdf.extracted?.vendor_names || [];
+  if (!ex.length) return false;
+  const rowTokens = normTokens(row.vendor);
+  if (!rowTokens.length) return false;
+  for (const vn of ex) {
+    const recTokens = normTokens(vn);
+    const hits = rowTokens.filter(t => recTokens.some(r => r.includes(t) || t.includes(r)));
+    // 토큰의 절반 이상 일치 또는 핵심 토큰 1개 이상 일치
+    if (hits.length >= Math.max(1, Math.ceil(rowTokens.length / 2))) return true;
+  }
+  return false;
+}
+
+// 핵심: E열 DEBIT 금액으로 1차 매칭. 동일 금액 PDF 여럿이면 첫 번째 + 중복 표시.
 function findPdfForRow(row, pdfs) {
   if (!pdfs.length) return null;
-  const scored = pdfs.map(p => ({ pdf: p, ...scoreByContent(row, p) }))
-    .sort((a, b) => b.score - a.score);
-  const best = scored[0];
-  if (!best || best.score < 0.25) return null;
-  return { ...best.pdf, _matchScore: best.score, _matchReasons: best.reasons };
+  const expected = row.debit; // E열 DEBIT만 기준
+  if (expected == null || isNaN(expected)) return null;
+
+  // 금액 일치하는 PDF 모두 수집
+  const amountHits = pdfs
+    .map((p, idx) => ({ pdf: p, idx, hit: pdfHasAmount(p, expected) }))
+    .filter(x => x.hit);
+
+  if (!amountHits.length) return null;
+
+  // 첫 번째를 메인 매칭으로
+  const main = amountHits[0];
+  const duplicates = amountHits.slice(1);
+  const invOk = invoiceMatched(row, main.pdf);
+  const venOk = vendorMatched(row, main.pdf);
+
+  return {
+    ...main.pdf,
+    _matchedAmount: expected,
+    _invoiceOk: invOk,
+    _vendorOk: venOk,
+    _duplicateIndexes: duplicates.map(d => d.idx + 1), // 1-base
+    _duplicatePdfs: duplicates.map(d => ({ name: d.pdf.name, idx: d.idx + 1 }))
+  };
 }
 
 async function aiExtract(pdfText, filename) {
@@ -438,21 +446,8 @@ runBtn.addEventListener('click', async () => {
     }
     await Promise.all(Array.from({length: concurrency}, worker));
 
-    const findings = [];
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const pdf = findPdfForRow(row, pdfs);
-      setProgress(`AI 검토 중... (${i+1}/${rows.length}) ${row.invoice || row.vendor || ''}`, 60 + (i+1)/rows.length*40);
-      let ai;
-      if (!pdf) {
-        ai = { verdict:'MISSING', pdf_amount:null, pdf_currency:null, is_partial:false,
-               note:'대응되는 PDF 미발견. 추출된 인보이스 번호·벤더·금액 모두 정산서 행과 유사도 25% 미만.' };
-      } else {
-        try { ai = await aiReview(row, pdf.text, pdf.extracted); }
-        catch (e) { ai = { verdict:'MISMATCH', pdf_amount:null, pdf_currency:null, is_partial:false, note:'AI 오류: '+e.message }; }
-      }
-      findings.push({ row, pdf, ai });
-    }
+    setProgress(`금액 매칭 중...`, 90);
+    const findings = rows.map(row => ({ row, pdf: findPdfForRow(row, pdfs) }));
 
     setProgress('완료', 100);
     setStep(3);
@@ -466,8 +461,14 @@ runBtn.addEventListener('click', async () => {
 });
 
 function renderResult(findings, pdfs) {
-  const counts = { OK:0, WARN:0, MISMATCH:0, MISSING:0 };
-  findings.forEach(f => counts[f.ai.verdict] = (counts[f.ai.verdict]||0) + 1);
+  const counts = { OK:0, DUP:0, MISSING:0 };
+  findings.forEach(f => {
+    let v;
+    if (!f.pdf) v = 'MISSING';
+    else if (f.pdf._duplicateIndexes && f.pdf._duplicateIndexes.length) v = 'DUP';
+    else v = 'OK';
+    counts[v] = (counts[v]||0) + 1;
+  });
 
   // PDF blob URL 캐시
   const urlMap = new Map();
@@ -480,26 +481,44 @@ function renderResult(findings, pdfs) {
   };
 
   const rowsHtml = findings.map((f, i) => {
-    const v = f.ai.verdict;
-    const tagCls = v==='OK'?'ok':v==='WARN'?'warn':v==='MISMATCH'?'err':'muted';
-    const trCls = v==='OK'?'ok':v==='WARN'?'warn':v==='MISMATCH'?'err':'';
-    const expected = f.row.localAmt ?? f.row.debit;
-    const cur = f.row.currency;
     const url = urlFor(f.pdf);
-    const matchInfo = f.pdf && f.pdf._matchReasons ?
-      `<div class="matchInfo">유사도 ${(f.pdf._matchScore*100).toFixed(0)}% · ${esc(f.pdf._matchReasons.join(' · '))}</div>` : '';
-    const diffPct = (f.ai.diff_percent != null) ? `<span class="diffPct">${f.ai.diff_percent>0?'+':''}${f.ai.diff_percent.toFixed(1)}%</span>` : '';
-    const reasonTag = f.ai.mismatch_reason && f.ai.mismatch_reason !== 'NONE' ?
-      `<span class="rTag rT-${f.ai.mismatch_reason}">${reasonLabel(f.ai.mismatch_reason)}</span>` : '';
+    const expected = f.row.debit;
+    const cur = f.row.currency;
+
+    // 매칭 상태 결정
+    let verdict, vCls, vLabel;
+    if (!f.pdf) { verdict='MISSING'; vCls='muted'; vLabel='증빙 미발견'; }
+    else if (f.pdf._duplicateIndexes && f.pdf._duplicateIndexes.length) { verdict='DUP'; vCls='warn'; vLabel='중복 인보이스 검증필요'; }
+    else { verdict='OK'; vCls='ok'; vLabel='금액 일치'; }
+
+    const invOk = f.pdf?._invoiceOk;
+    const venOk = f.pdf?._vendorOk;
+    const invBadge = invOk===true ? '<span class="optTag ok">✓ 인보이스 일치</span>'
+                   : invOk===false ? '<span class="optTag err">✗ 인보이스 불일치</span>'
+                   : '<span class="optTag muted">— 인보이스 정보 없음</span>';
+    const venBadge = venOk===true ? '<span class="optTag ok">✓ 벤더명 일치</span>'
+                   : venOk===false ? '<span class="optTag err">✗ 벤더명 불일치</span>'
+                   : '<span class="optTag muted">— 벤더명 정보 없음</span>';
+
+    const dupHtml = f.pdf?._duplicatePdfs?.length ?
+      `<div class="dupHtml">⚠️ 동일 금액의 다른 PDF ${f.pdf._duplicatePdfs.length}건과 함께 검증 필요:<br>${
+        f.pdf._duplicatePdfs.map(d => `· #${d.idx} ${esc(d.name)}`).join('<br>')
+      }</div>` : '';
+
+    const trCls = verdict==='OK' ? 'ok' : verdict==='DUP' ? 'warn' : '';
+
     return `<tr class="${trCls}">
       <td class="num">${i+1}</td>
       <td>${esc(f.row.invoice)||'<span style="color:var(--muted)">—</span>'}</td>
       <td>${esc(f.row.vendor)||'<span style="color:var(--muted)">—</span>'}</td>
       <td class="num">${fmtAmt(expected, cur)}</td>
-      <td class="num">${fmtAmt(f.ai.pdf_amount, f.ai.pdf_currency || cur)}${f.ai.is_partial?'<div class="note">📌 부분 전표</div>':''}${diffPct}</td>
-      <td><span class="tag ${tagCls}">${v}</span>${reasonTag?'<div style="margin-top:4px;">'+reasonTag+'</div>':''}</td>
-      <td>${f.pdf ? `<a class="pdfLink" href="${url}" target="_blank">${esc(f.pdf.name)}</a>${matchInfo}` : '<span style="color:var(--muted)">매칭 없음</span>'}</td>
-      <td><div class="detail">${esc(f.ai.note||'')}</div></td>
+      <td class="num">${f.pdf ? fmtAmt(expected, cur) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td>
+        <span class="tag ${vCls}">${vLabel}</span>
+        <div class="optWrap">${invBadge} ${venBadge}</div>
+        ${dupHtml}
+      </td>
+      <td>${f.pdf ? `<a class="pdfLink" href="${url}" target="_blank">${esc(f.pdf.name)}</a>` : '<span style="color:var(--muted)">금액 일치 PDF 없음</span>'}</td>
     </tr>`;
   }).join('');
 
@@ -507,12 +526,12 @@ function renderResult(findings, pdfs) {
     <section class="card">
       <h2>📊 검토 결과 요약</h2>
       <div class="summary">
-        <div class="sbox ok"><div class="v">${counts.OK||0}</div><div class="l">일치 OK</div></div>
-        <div class="sbox warn"><div class="v">${counts.WARN||0}</div><div class="l">주의 WARN (±5%)</div></div>
-        <div class="sbox err"><div class="v">${counts.MISMATCH||0}</div><div class="l">불일치 MISMATCH</div></div>
-        <div class="sbox"><div class="v">${counts.MISSING||0}</div><div class="l">증빙 누락 MISSING</div></div>
+        <div class="sbox ok"><div class="v">${counts.OK||0}</div><div class="l">금액 일치</div></div>
+        <div class="sbox warn"><div class="v">${counts.DUP||0}</div><div class="l">중복 인보이스 검증필요</div></div>
+        <div class="sbox err"><div class="v">${counts.MISSING||0}</div><div class="l">증빙 미발견</div></div>
+        <div class="sbox"><div class="v">${findings.length}</div><div class="l">전체 행수</div></div>
       </div>
-      ${counts.MISMATCH || counts.MISSING ? '<div class="banner warn">⚠️ 불일치/누락 항목이 있습니다. 관리사에 확인 요청 필요.</div>' : '<div class="banner ok">✓ 전체 항목 정상 또는 경미한 차이만 있습니다.</div>'}
+      ${counts.MISSING ? '<div class="banner warn">⚠️ 증빙 미발견 항목이 있습니다. 관리사에 확인 요청 필요.</div>' : (counts.DUP ? '<div class="banner warn">📌 동일 금액 PDF가 여러 건인 항목은 인보이스/벤더명으로 추가 검증 필요.</div>' : '<div class="banner ok">✓ 모든 행이 증빙 금액과 일치합니다.</div>')}
 
       <div class="tableWrap">
         <table class="resTable">
@@ -520,11 +539,10 @@ function renderResult(findings, pdfs) {
             <th>#</th>
             <th>INVOICE NO.</th>
             <th>VENDOR</th>
-            <th style="text-align:right;">정산서 금액</th>
+            <th style="text-align:right;">정산서 금액(E열)</th>
             <th style="text-align:right;">증빙 금액</th>
-            <th>판정</th>
+            <th>판정 및 옵션 검증</th>
             <th>증빙 PDF</th>
-            <th>AI 코멘트</th>
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
