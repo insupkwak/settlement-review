@@ -98,6 +98,13 @@ input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);}
 .pdfLink:hover{text-decoration:underline;}
 
 .detail{font-size:.8rem;color:var(--muted);margin-top:4px;white-space:pre-wrap;word-break:break-word;}
+.matchInfo{font-size:.72rem;color:#94a3b8;margin-top:3px;line-height:1.4;}
+.diffPct{display:inline-block;margin-top:4px;padding:2px 7px;border-radius:8px;font-size:.72rem;font-weight:800;background:rgba(245,158,11,.18);color:#fcd34d;}
+.rTag{display:inline-block;padding:2px 7px;border-radius:8px;font-size:.7rem;font-weight:700;background:var(--border);color:var(--muted);}
+.rT-AMOUNT_DIFF{background:rgba(239,68,68,.18);color:#fca5a5;}
+.rT-CURRENCY_DIFF{background:rgba(168,85,247,.18);color:#d8b4fe;}
+.rT-NO_AMOUNT_FOUND{background:rgba(245,158,11,.18);color:#fcd34d;}
+.rT-PARTIAL_OK{background:rgba(34,197,94,.18);color:#86efac;}
 details.adv{margin-top:6px;font-size:.82rem;}
 details.adv summary{cursor:pointer;color:var(--accent2);font-weight:600;}
 details.adv .body{margin-top:6px;background:#0b1220;padding:8px 10px;border-radius:6px;color:var(--muted);font-family:Consolas,monospace;font-size:.78rem;white-space:pre-wrap;max-height:200px;overflow:auto;}
@@ -281,26 +288,90 @@ async function pdfToText(blob) {
   return text;
 }
 
-function findPdfForRow(row, pdfs) {
-  // 1) 인보이스 번호로 파일명/내용 매칭
+function normTokens(s) {
+  return String(s || '').toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/).filter(t => t.length >= 2);
+}
+function normFlat(s) {
+  return String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+function scorePdfMatch(row, pdf) {
+  const nameFlat = normFlat(pdf.name);
+  const textFlat = normFlat(pdf.text || '');
+  const out = { score: 0, reasons: [] };
+
+  // 1) 인보이스 번호: 완전/부분/숫자 꼬리
   if (row.invoice) {
-    const inv = row.invoice.replace(/[^A-Za-z0-9]/g,'').toLowerCase();
+    const inv = normFlat(row.invoice);
     if (inv.length >= 3) {
-      const byName = pdfs.find(p => p.name.replace(/[^A-Za-z0-9]/g,'').toLowerCase().includes(inv));
-      if (byName) return byName;
-      const byText = pdfs.find(p => p.text && p.text.replace(/[^A-Za-z0-9]/g,'').toLowerCase().includes(inv));
-      if (byText) return byText;
+      if (nameFlat.includes(inv)) { out.score += 1.0; out.reasons.push('파일명에 인보이스 번호 일치'); }
+      else if (textFlat.includes(inv)) { out.score += 0.85; out.reasons.push('본문에 인보이스 번호 일치'); }
+      else {
+        const digits = inv.replace(/\D/g, '');
+        if (digits.length >= 4) {
+          const tail = digits.slice(-Math.min(6, digits.length));
+          if (nameFlat.includes(tail) || textFlat.includes(tail)) {
+            out.score += 0.45; out.reasons.push('인보이스 번호 끝자리 일치(' + tail + ')');
+          }
+        }
+      }
     }
   }
-  // 2) 벤더명으로 폴백
+
+  // 2) 벤더명: 토큰 부분 일치
   if (row.vendor) {
-    const v = row.vendor.toLowerCase().split(/\s+/)[0];
-    if (v && v.length >= 3) {
-      const byName = pdfs.find(p => p.name.toLowerCase().includes(v));
-      if (byName) return byName;
+    const tokens = normTokens(row.vendor);
+    let hit = 0, hits = [];
+    for (const tk of tokens) {
+      if (tk.length < 2) continue;
+      if (nameFlat.includes(tk) || textFlat.includes(tk)) { hit++; hits.push(tk); }
+    }
+    if (tokens.length && hit > 0) {
+      const r = hit / tokens.length;
+      out.score += 0.5 * r;
+      out.reasons.push(`벤더명 토큰 ${hit}/${tokens.length}건 일치(${hits.slice(0,3).join(', ')})`);
     }
   }
-  return null;
+
+  // 3) 금액 일치 (텍스트 안에 정확한 숫자가 등장하는지)
+  const expected = row.localAmt ?? row.debit;
+  if (expected && pdf.text) {
+    const amt = Math.round(expected);
+    const variants = new Set([
+      String(amt),
+      amt.toLocaleString('en-US'),
+      amt.toLocaleString('ko-KR'),
+      expected.toFixed(2),
+      Number(expected).toLocaleString('en-US', { minimumFractionDigits: 2 })
+    ]);
+    for (const v of variants) {
+      if (v && pdf.text.includes(v)) {
+        out.score += 0.4; out.reasons.push('본문에 금액 ' + v + ' 발견');
+        break;
+      }
+    }
+  }
+
+  // 4) 통화 코드
+  if (row.currency && pdf.text) {
+    const cur = row.currency.toUpperCase();
+    if (cur.length >= 3 && pdf.text.toUpperCase().includes(cur)) {
+      out.score += 0.15; out.reasons.push('통화 ' + cur + ' 일치');
+    }
+  }
+  return out;
+}
+
+function findPdfForRow(row, pdfs) {
+  if (!pdfs.length) return null;
+  const scored = pdfs.map(p => ({ pdf: p, ...scorePdfMatch(row, p) }))
+    .sort((a, b) => b.score - a.score);
+  const best = scored[0];
+  if (!best || best.score < 0.3) return null;
+  // 매칭 메타데이터를 pdf에 동봉
+  return { ...best.pdf, _matchScore: best.score, _matchReasons: best.reasons };
 }
 
 async function aiReview(row, pdfText) {
@@ -384,14 +455,19 @@ function renderResult(findings, pdfs) {
     const expected = f.row.localAmt ?? f.row.debit;
     const cur = f.row.currency;
     const url = urlFor(f.pdf);
+    const matchInfo = f.pdf && f.pdf._matchReasons ?
+      `<div class="matchInfo">유사도 ${(f.pdf._matchScore*100).toFixed(0)}% · ${esc(f.pdf._matchReasons.join(' · '))}</div>` : '';
+    const diffPct = (f.ai.diff_percent != null) ? `<span class="diffPct">${f.ai.diff_percent>0?'+':''}${f.ai.diff_percent.toFixed(1)}%</span>` : '';
+    const reasonTag = f.ai.mismatch_reason && f.ai.mismatch_reason !== 'NONE' ?
+      `<span class="rTag rT-${f.ai.mismatch_reason}">${reasonLabel(f.ai.mismatch_reason)}</span>` : '';
     return `<tr class="${trCls}">
       <td class="num">${i+1}</td>
       <td>${esc(f.row.invoice)||'<span style="color:var(--muted)">—</span>'}</td>
       <td>${esc(f.row.vendor)||'<span style="color:var(--muted)">—</span>'}</td>
       <td class="num">${fmtAmt(expected, cur)}</td>
-      <td class="num">${fmtAmt(f.ai.pdf_amount, f.ai.pdf_currency || cur)}${f.ai.is_partial?'<div class="note">부분 전표</div>':''}</td>
-      <td><span class="tag ${tagCls}">${v}</span></td>
-      <td>${f.pdf ? `<a class="pdfLink" href="${url}" target="_blank">${esc(f.pdf.name)}</a>` : '<span style="color:var(--muted)">매칭 없음</span>'}</td>
+      <td class="num">${fmtAmt(f.ai.pdf_amount, f.ai.pdf_currency || cur)}${f.ai.is_partial?'<div class="note">📌 부분 전표</div>':''}${diffPct}</td>
+      <td><span class="tag ${tagCls}">${v}</span>${reasonTag?'<div style="margin-top:4px;">'+reasonTag+'</div>':''}</td>
+      <td>${f.pdf ? `<a class="pdfLink" href="${url}" target="_blank">${esc(f.pdf.name)}</a>${matchInfo}` : '<span style="color:var(--muted)">매칭 없음</span>'}</td>
       <td><div class="detail">${esc(f.ai.note||'')}</div></td>
     </tr>`;
   }).join('');
@@ -431,7 +507,15 @@ function renderResult(findings, pdfs) {
 }
 
 function esc(s){return String(s??'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);}
-window.fmtAmt = fmtAmt; window.esc = esc;
+function reasonLabel(code) {
+  return {
+    AMOUNT_DIFF: '💸 금액 차이',
+    CURRENCY_DIFF: '💱 통화 불일치',
+    NO_AMOUNT_FOUND: '🔎 금액 추출 실패',
+    PARTIAL_OK: '📌 부분 전표 일치'
+  }[code] || code;
+}
+window.fmtAmt = fmtAmt; window.esc = esc; window.reasonLabel = reasonLabel;
 </script>
 </body>
 </html>

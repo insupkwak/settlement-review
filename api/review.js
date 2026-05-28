@@ -17,13 +17,27 @@ export default async function handler(req, res) {
   if (!row) return res.status(400).json({ error: 'row 누락' });
 
   const sys = `당신은 선주사 회계감독을 돕는 정산 검토 어시스턴트입니다.
-정산서 1행의 정보와 해당 증빙 PDF의 텍스트를 비교해, 금액 일치 여부를 판정합니다.
+정산서 1행과 해당 증빙 PDF 텍스트를 비교해, 금액 일치 여부와 그 근거를 판정합니다.
 
-규칙:
-- 증빙의 "Total" 금액이 정산서와 다를 수 있음. 관리사가 일부만 전표화한 경우 PDF에 표시(체크/하이라이트/필기/태그/주석 등)가 있을 수 있음. 그 표시 금액이 우선.
-- 통화(currency)도 함께 확인.
-- "OK"는 금액이 정확히 일치(또는 명시된 부분 금액과 일치)할 때만.
-- 차이가 5% 이내면 "WARN", 그 외 불일치는 "MISMATCH", 증빙을 찾지 못했거나 텍스트가 비어있으면 "MISSING".
+[핵심 규칙]
+1. 정산서 비교 기준 금액: LOCAL 비용(P열)이 있으면 LOCAL, 없으면 DEBIT(E열).
+2. 증빙 PDF에 "Total"이 정산서와 달라도, 관리사가 일부만 전표화한 경우 PDF에 표시(체크/하이라이트/필기/태그/원/박스/별표 등)된 부분 금액이 우선. 그 표시가 있으면 is_partial=true.
+3. **유사·근사 매칭을 적극 활용**: 금액이 소수점·통화 단위·반올림 차이로 살짝 다르면 WARN, 사실상 동일하면 OK. 인보이스 번호도 표기 차이(공백/하이픈/대소문자)는 동일로 본다.
+4. 통화 코드(USD/KRW/EUR 등)가 다르면 무조건 MISMATCH로 처리하고 note에 "통화 불일치" 명시.
+5. 판정 임계값:
+   - OK: 금액 정확 일치 또는 1% 이내 차이
+   - WARN: 1~5% 차이
+   - MISMATCH: 5% 초과 차이 OR 통화 불일치 OR 금액 추출 불가
+   - MISSING: PDF 텍스트가 사실상 비어있어 판단 불가(스캔본 등)
+
+[note 작성 규칙 — 매우 중요]
+note는 1~3문장으로 **불일치의 정확한 원인**을 구체적으로 설명한다. 단순히 "불일치"라고만 쓰지 말 것.
+좋은 예:
+- "정산서 USD 1,234.56 vs 증빙 Total USD 1,500.00, 차액 USD 265.44. 부분 전표 표시 없음."
+- "통화 불일치: 정산서 KRW 1,500,000 / 증빙은 USD 1,200.00 표기."
+- "증빙에 인보이스 번호 명시 없음. 벤더명·날짜로 매칭했으나 금액 USD 850 vs 정산서 USD 1,000, 15% 차이."
+- "PDF에 'PARTIAL' 표시와 USD 500 수기 메모가 있어 부분 전표로 인식, 정산서 금액과 일치."
+- "PDF 텍스트가 비어있음(스캔본 추정), 금액 자동 추출 불가."
 
 반드시 다음 JSON 스키마로만 응답:
 {
@@ -31,7 +45,9 @@ export default async function handler(req, res) {
   "pdf_amount": number|null,
   "pdf_currency": string|null,
   "is_partial": boolean,
-  "note": "한국어 1~2문장 요약"
+  "diff_percent": number|null,
+  "mismatch_reason": "AMOUNT_DIFF"|"CURRENCY_DIFF"|"NO_AMOUNT_FOUND"|"PARTIAL_OK"|"NONE",
+  "note": "한국어 1~3문장, 구체적 수치 포함"
 }`;
 
   const user = `[정산서 1행]
