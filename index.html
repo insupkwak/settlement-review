@@ -9,182 +9,190 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
 <style>
 :root{
-  --bg:#0b1220;--card:#111c34;--card2:#1a2649;--border:#2a3a66;
-  --text:#e2e8f0;--muted:#94a3b8;
-  --accent:#3b82f6;--accent2:#60a5fa;
-  --ok:#22c55e;--warn:#f59e0b;--err:#ef4444;
-  --gold:#fbbf24;
+  --bg:#f1f3f6;--surface:#ffffff;--alt:#f8fafc;--line:#cbd5e1;--line2:#e2e8f0;
+  --text:#0f172a;--muted:#64748b;--head:#1e293b;
+  --accent:#1d4ed8;--accent2:#2563eb;
+  --ok:#15803d;--okbg:#dcfce7;
+  --warn:#b45309;--warnbg:#fef3c7;
+  --err:#b91c1c;--errbg:#fee2e2;
+  --info:#1e40af;--infobg:#dbeafe;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Malgun Gothic',sans-serif;line-height:1.5;}
-header{background:linear-gradient(135deg,#0f172a,#1e293b);padding:28px 24px;border-bottom:1px solid var(--border);text-align:center;}
-header h1{font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:6px;}
-header p{color:var(--muted);font-size:.92rem;}
-main{max-width:1280px;margin:0 auto;padding:24px 20px 60px;}
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:18px;}
-.card h2{font-size:1.1rem;font-weight:800;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
-.step{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px;}
-.step .n{width:30px;height:30px;border-radius:50%;background:var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;}
-.step.active{border-color:var(--accent);}
-.step.active .n{background:var(--accent);color:#fff;}
-.step.done .n{background:var(--ok);color:#fff;}
-.step .lbl{font-weight:600;font-size:.92rem;}
-@media(max-width:680px){.steps{grid-template-columns:1fr;}}
+html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Malgun Gothic','맑은 고딕',sans-serif;line-height:1.45;font-size:14px;}
+header{background:var(--head);color:#fff;padding:18px 28px;border-bottom:3px solid var(--accent);}
+header .row{max-width:1480px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:20px;}
+header h1{font-size:1.2rem;font-weight:700;letter-spacing:.2px;}
+header .sub{color:#cbd5e1;font-size:.82rem;}
+main{max-width:1480px;margin:0 auto;padding:18px 24px 80px;}
 
-label{display:block;font-size:.88rem;font-weight:600;color:var(--text);margin-bottom:6px;}
-.hint{font-size:.78rem;color:var(--muted);margin-top:4px;}
+.card{background:var(--surface);border:1px solid var(--line);margin-bottom:14px;}
+.card .head{background:var(--alt);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;}
+.card .head h2{font-size:.92rem;font-weight:700;letter-spacing:.4px;color:var(--head);text-transform:uppercase;}
+.card .head .meta{font-size:.78rem;color:var(--muted);}
+.card .body{padding:14px 16px;}
+
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-bottom:14px;border:1px solid var(--line);background:var(--surface);}
+.step{padding:10px 14px;display:flex;align-items:center;gap:10px;border-right:1px solid var(--line);background:#fff;}
+.step:last-child{border-right:none;}
+.step .n{width:24px;height:24px;background:var(--line);color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex-shrink:0;}
+.step.active{background:var(--infobg);}
+.step.active .n{background:var(--accent);color:#fff;}
+.step.done{background:var(--okbg);}
+.step.done .n{background:var(--ok);color:#fff;}
+.step .lbl{font-weight:600;font-size:.82rem;color:var(--head);}
+@media(max-width:680px){.steps{grid-template-columns:1fr;}.step{border-right:none;border-bottom:1px solid var(--line);}.step:last-child{border-bottom:none;}}
+
+label{display:block;font-size:.78rem;font-weight:700;color:var(--head);margin-bottom:4px;letter-spacing:.3px;text-transform:uppercase;}
+.hint{font-size:.72rem;color:var(--muted);margin-top:3px;}
 input[type=password],input[type=text]{
-  width:100%;background:var(--card2);border:2px solid var(--border);border-radius:10px;
-  padding:11px 14px;color:var(--text);font-size:.95rem;outline:none;
+  width:100%;background:#fff;border:1px solid var(--line);
+  padding:8px 10px;color:var(--text);font-size:.88rem;outline:none;
 }
-input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 @media(max-width:720px){.row2{grid-template-columns:1fr;}}
 
-.drop{
-  background:var(--card2);border:2px dashed var(--border);border-radius:12px;
-  padding:24px 16px;text-align:center;cursor:pointer;transition:all .15s ease;
-}
-.drop:hover{border-color:var(--accent);background:rgba(59,130,246,.06);}
-.drop.has{border-color:var(--ok);background:rgba(34,197,94,.06);border-style:solid;}
-.drop .ic{font-size:2.2rem;margin-bottom:6px;}
-.drop .ttl{font-weight:700;font-size:.98rem;margin-bottom:4px;color:#fff;}
-.drop .sub{font-size:.8rem;color:var(--muted);}
+.drop{background:var(--alt);border:1px dashed var(--line);padding:18px 14px;text-align:center;cursor:pointer;transition:border-color .12s ease,background .12s ease;}
+.drop:hover{border-color:var(--accent);background:#eff6ff;}
+.drop.has{border-color:var(--ok);background:var(--okbg);border-style:solid;}
+.drop .ic{font-size:1.6rem;margin-bottom:4px;}
+.drop .ttl{font-weight:700;font-size:.88rem;color:var(--head);}
+.drop .sub{font-size:.74rem;color:var(--muted);margin-top:2px;}
 .drop input[type=file]{display:none;}
-.fileLabel{display:inline-flex;align-items:center;gap:8px;background:rgba(34,197,94,.15);color:#86efac;padding:7px 14px;border-radius:20px;font-size:.86rem;font-weight:600;margin-top:8px;}
+.fileLabel{display:inline-block;background:#fff;color:var(--ok);padding:3px 10px;font-size:.78rem;font-weight:700;margin-top:6px;border:1px solid var(--ok);}
 
-.btn{
-  background:linear-gradient(135deg,var(--accent),var(--accent2));
-  color:#fff;border:none;border-radius:12px;padding:13px 24px;
-  font-size:1rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;
-  transition:transform .12s ease,box-shadow .12s ease;
-}
-.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(59,130,246,.4);}
-.btn:disabled{opacity:.4;cursor:not-allowed;}
-.btn.full{width:100%;justify-content:center;padding:15px;font-size:1.05rem;}
-.btn.warn{background:linear-gradient(135deg,#f59e0b,#d97706);}
+.btn{background:var(--accent);color:#fff;border:1px solid var(--accent);padding:10px 18px;font-size:.88rem;font-weight:700;cursor:pointer;letter-spacing:.4px;text-transform:uppercase;transition:background .12s ease;}
+.btn:hover:not(:disabled){background:var(--accent2);}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+.btn.full{width:100%;padding:12px;}
 
-.progress{margin-top:12px;background:var(--card2);border-radius:10px;padding:12px 16px;font-size:.88rem;color:var(--muted);}
-.progress .bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:8px;}
-.progress .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));width:0%;transition:width .25s ease;}
+.progress{background:var(--alt);border:1px solid var(--line);padding:10px 14px;font-size:.82rem;color:var(--muted);margin-top:10px;}
+.progress .bar{height:5px;background:var(--line2);overflow:hidden;margin-top:6px;}
+.progress .fill{height:100%;background:var(--accent);width:0%;transition:width .25s ease;}
 
-/* 결과 */
-.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
-@media(max-width:720px){.summary{grid-template-columns:repeat(2,1fr);}}
-.sbox{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;}
-.sbox .v{font-size:1.5rem;font-weight:800;color:#fff;}
-.sbox .l{font-size:.78rem;color:var(--muted);margin-top:2px;font-weight:600;}
-.sbox.ok{border-color:rgba(34,197,94,.5);} .sbox.ok .v{color:var(--ok);}
-.sbox.warn{border-color:rgba(245,158,11,.5);} .sbox.warn .v{color:var(--warn);}
-.sbox.err{border-color:rgba(239,68,68,.5);} .sbox.err .v{color:var(--err);}
+/* 결과 요약 */
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);background:#fff;margin-bottom:14px;}
+.sbox{padding:14px;border-right:1px solid var(--line);text-align:left;}
+.sbox:last-child{border-right:none;}
+.sbox .l{font-size:.7rem;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;}
+.sbox .v{font-size:1.8rem;font-weight:800;color:var(--head);line-height:1;font-variant-numeric:tabular-nums;}
+.sbox.ok .v{color:var(--ok);}
+.sbox.warn .v{color:var(--warn);}
+.sbox.err .v{color:var(--err);}
+@media(max-width:720px){.summary{grid-template-columns:repeat(2,1fr);}.sbox{border-right:1px solid var(--line);border-bottom:1px solid var(--line);}.sbox:nth-child(2){border-right:none;}.sbox:nth-last-child(-n+2){border-bottom:none;}}
 
-.resTable{width:100%;border-collapse:collapse;font-size:.88rem;background:var(--card2);border-radius:10px;overflow:hidden;}
-.resTable th,.resTable td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top;}
-.resTable th{background:#0f172a;color:#fff;font-weight:700;font-size:.82rem;letter-spacing:.3px;position:sticky;top:0;}
+/* 결과 표 */
+.tableWrap{border:1px solid var(--line);background:#fff;overflow:auto;max-height:78vh;}
+.resTable{width:100%;border-collapse:collapse;font-size:.82rem;}
+.resTable th,.resTable td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line2);border-right:1px solid var(--line2);vertical-align:top;}
+.resTable th{background:var(--head);color:#fff;font-weight:600;font-size:.74rem;letter-spacing:.4px;text-transform:uppercase;position:sticky;top:0;border-right-color:#334155;white-space:nowrap;}
+.resTable th:last-child,.resTable td:last-child{border-right:none;}
 .resTable tr:last-child td{border-bottom:none;}
-.resTable td.num{text-align:right;font-variant-numeric:tabular-nums;}
-.resTable tr.ok{background:rgba(34,197,94,.05);}
-.resTable tr.warn{background:rgba(245,158,11,.07);}
-.resTable tr.err{background:rgba(239,68,68,.07);}
-.tag{display:inline-block;padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;letter-spacing:.4px;white-space:nowrap;}
-.tag.ok{background:rgba(34,197,94,.18);color:#86efac;}
-.tag.warn{background:rgba(245,158,11,.18);color:#fcd34d;}
-.tag.err{background:rgba(239,68,68,.18);color:#fca5a5;}
-.tag.muted{background:var(--border);color:var(--muted);}
-.tableWrap{overflow:auto;max-height:75vh;border:1px solid var(--border);border-radius:10px;}
-.note{font-size:.78rem;color:var(--muted);margin-top:6px;line-height:1.5;}
-.pdfLink{color:var(--accent2);text-decoration:none;font-size:.78rem;}
+.resTable tbody tr:nth-child(even){background:var(--alt);}
+.resTable tr.ok{background:#f0fdf4!important;}
+.resTable tr.warn{background:#fffbeb!important;}
+.resTable tr.err{background:#fef2f2!important;}
+.resTable td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
+.resTable td.idx{text-align:center;color:var(--muted);width:38px;font-weight:700;}
+
+.tag{display:inline-block;padding:2px 8px;font-size:.7rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;border:1px solid transparent;}
+.tag.ok{background:var(--okbg);color:var(--ok);border-color:#86efac;}
+.tag.warn{background:var(--warnbg);color:var(--warn);border-color:#fcd34d;}
+.tag.err{background:var(--errbg);color:var(--err);border-color:#fca5a5;}
+.tag.muted{background:#f1f5f9;color:var(--muted);border-color:var(--line);}
+
+.optWrap{margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;}
+.optTag{display:inline-block;padding:1px 7px;font-size:.7rem;font-weight:600;border:1px solid;}
+.optTag.ok{background:var(--okbg);color:var(--ok);border-color:#86efac;}
+.optTag.err{background:var(--errbg);color:var(--err);border-color:#fca5a5;}
+.optTag.muted{background:#f1f5f9;color:var(--muted);border-color:var(--line);}
+
+.dupHtml{margin-top:6px;padding:6px 10px;background:var(--warnbg);border-left:3px solid var(--warn);color:#78350f;font-size:.74rem;line-height:1.5;}
+.matchInfo{font-size:.7rem;color:var(--muted);margin-top:3px;line-height:1.4;}
+.pdfLink{color:var(--accent);text-decoration:none;font-size:.78rem;font-weight:600;word-break:break-all;}
 .pdfLink:hover{text-decoration:underline;}
+.note{font-size:.74rem;color:var(--muted);margin-top:6px;line-height:1.5;}
 
-.detail{font-size:.8rem;color:var(--muted);margin-top:4px;white-space:pre-wrap;word-break:break-word;}
-.matchInfo{font-size:.72rem;color:#94a3b8;margin-top:3px;line-height:1.4;}
-.diffPct{display:inline-block;margin-top:4px;padding:2px 7px;border-radius:8px;font-size:.72rem;font-weight:800;background:rgba(245,158,11,.18);color:#fcd34d;}
-.rTag{display:inline-block;padding:2px 7px;border-radius:8px;font-size:.7rem;font-weight:700;background:var(--border);color:var(--muted);}
-.rT-AMOUNT_DIFF{background:rgba(239,68,68,.18);color:#fca5a5;}
-.rT-CURRENCY_DIFF{background:rgba(168,85,247,.18);color:#d8b4fe;}
-.rT-NO_AMOUNT_FOUND{background:rgba(245,158,11,.18);color:#fcd34d;}
-.rT-PARTIAL_OK{background:rgba(34,197,94,.18);color:#86efac;}
-.optWrap{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;}
-.optTag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:.72rem;font-weight:700;}
-.optTag.ok{background:rgba(34,197,94,.15);color:#86efac;}
-.optTag.err{background:rgba(239,68,68,.15);color:#fca5a5;}
-.optTag.muted{background:rgba(148,163,184,.12);color:#94a3b8;}
-.dupHtml{margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#fde68a;font-size:.78rem;line-height:1.6;}
-details.adv{margin-top:6px;font-size:.82rem;}
-details.adv summary{cursor:pointer;color:var(--accent2);font-weight:600;}
-details.adv .body{margin-top:6px;background:#0b1220;padding:8px 10px;border-radius:6px;color:var(--muted);font-family:Consolas,monospace;font-size:.78rem;white-space:pre-wrap;max-height:200px;overflow:auto;}
+.banner{padding:10px 14px;border-left:4px solid;margin-bottom:12px;font-size:.84rem;font-weight:500;}
+.banner.info{background:var(--infobg);border-left-color:var(--accent);color:var(--info);}
+.banner.err{background:var(--errbg);border-left-color:var(--err);color:var(--err);}
+.banner.warn{background:var(--warnbg);border-left-color:var(--warn);color:var(--warn);}
+.banner.ok{background:var(--okbg);border-left-color:var(--ok);color:var(--ok);}
 
-.banner{padding:12px 16px;border-radius:10px;margin-bottom:12px;font-size:.9rem;}
-.banner.info{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.4);color:#bfdbfe;}
-.banner.err{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fecaca;}
-.banner.warn{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fde68a;}
-.banner.ok{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.4);color:#bbf7d0;}
+footer{text-align:center;color:var(--muted);font-size:.74rem;padding:18px;border-top:1px solid var(--line);background:#fff;margin-top:30px;}
 
-footer{text-align:center;color:var(--muted);font-size:.78rem;padding:20px;}
+/* 인쇄 친화 */
+@media print{
+  body{background:#fff;}
+  header{background:#fff;color:#000;border-bottom:2px solid #000;}
+  .card{break-inside:avoid;}
+  .btn,.drop,.steps,.progress{display:none!important;}
+}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>📋 정산서 검토 시스템</h1>
-  <p>선주사 감독용 · 정산서(Excel) ↔ 증빙(PDF) 자동 대조</p>
+  <div class="row">
+    <div>
+      <h1>SETTLEMENT REVIEW · 정산서 검토 시스템</h1>
+      <div class="sub">선주사 감독용 · Excel 정산서 vs PDF 증빙 자동 대조</div>
+    </div>
+    <div class="sub">v2.0 · 내부용</div>
+  </div>
 </header>
 
 <main>
   <div class="steps">
-    <div class="step active" id="step1"><div class="n">1</div><div class="lbl">API 키 + 파일 업로드</div></div>
-    <div class="step" id="step2"><div class="n">2</div><div class="lbl">대조 검토</div></div>
-    <div class="step" id="step3"><div class="n">3</div><div class="lbl">결과 확인</div></div>
+    <div class="step active" id="step1"><div class="n">1</div><div class="lbl">파일 업로드</div></div>
+    <div class="step" id="step2"><div class="n">2</div><div class="lbl">자동 대조</div></div>
+    <div class="step" id="step3"><div class="n">3</div><div class="lbl">결과 검토</div></div>
   </div>
 
   <section class="card">
-    <h2>🔑 STEP 1 · 설정 및 파일 업로드</h2>
-
-    <div class="banner info" style="margin-bottom:14px;">
-      🔒 AI 키는 서버(.env)에 안전하게 보관됩니다. 별도 입력이 필요하지 않습니다.
-    </div>
-
-    <div class="row2">
-      <div>
-        <label>📊 정산서 (Excel)</label>
-        <div class="drop" id="dropXlsx" onclick="document.getElementById('fileXlsx').click()">
-          <div class="ic">📊</div>
-          <div class="ttl">Excel 파일 선택</div>
-          <div class="sub">관리사 정산서 (.xlsx, .xls)</div>
-          <input type="file" id="fileXlsx" accept=".xlsx,.xls">
-          <div id="xlsxName"></div>
+    <div class="head"><h2>STEP 1 · 파일 업로드</h2><div class="meta">정산서(.xlsx) + 증빙(.zip)</div></div>
+    <div class="body">
+      <div class="banner info">AI 키는 서버(.env)에 보관 · 별도 입력 불요. Excel 컬럼: <b>E</b>=Cat-I (DEBIT 필터) · <b>J</b>=Vendor · <b>L</b>=Invoice No · <b>O</b>=Currency · <b>P</b>=Amount.</div>
+      <div class="row2">
+        <div>
+          <label>정산서 EXCEL</label>
+          <div class="drop" id="dropXlsx" onclick="document.getElementById('fileXlsx').click()">
+            <div class="ic">📊</div>
+            <div class="ttl">Excel 파일 선택</div>
+            <div class="sub">관리사 정산서 (.xlsx, .xls)</div>
+            <input type="file" id="fileXlsx" accept=".xlsx,.xls">
+            <div id="xlsxName"></div>
+          </div>
+        </div>
+        <div>
+          <label>증빙 ZIP</label>
+          <div class="drop" id="dropZip" onclick="document.getElementById('fileZip').click()">
+            <div class="ic">📦</div>
+            <div class="ttl">ZIP 파일 선택</div>
+            <div class="sub">PDF 증빙 압축 파일 (.zip)</div>
+            <input type="file" id="fileZip" accept=".zip">
+            <div id="zipName"></div>
+          </div>
         </div>
       </div>
-      <div>
-        <label>📦 증빙 (ZIP)</label>
-        <div class="drop" id="dropZip" onclick="document.getElementById('fileZip').click()">
-          <div class="ic">📦</div>
-          <div class="ttl">ZIP 파일 선택</div>
-          <div class="sub">PDF 증빙 압축 파일 (.zip)</div>
-          <input type="file" id="fileZip" accept=".zip">
-          <div id="zipName"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="hint" style="margin-top:14px;">
-      Excel 컬럼 매핑 — E: DEBIT 비용 · I: INVOICE NO. · J: VENDOR NAME · O: CURRENCY · P: LOCAL 비용
     </div>
   </section>
 
   <section class="card">
-    <button class="btn full" id="runBtn" disabled>🔍 검토 시작</button>
-    <div class="progress" id="progress" style="display:none;">
-      <div id="progText">준비 중...</div>
-      <div class="bar"><div class="fill" id="progFill"></div></div>
+    <div class="head"><h2>STEP 2 · 대조 실행</h2><div class="meta">파일 두 개 업로드 후 실행</div></div>
+    <div class="body">
+      <button class="btn full" id="runBtn" disabled>검토 시작</button>
+      <div class="progress" id="progress" style="display:none;">
+        <div id="progText">준비 중...</div>
+        <div class="bar"><div class="fill" id="progFill"></div></div>
+      </div>
     </div>
   </section>
 
   <div id="result"></div>
 </main>
 
-<footer>© 정산서 검토 시스템 · 로컬 처리 · API 키는 브라우저에만 저장</footer>
+<footer>© Settlement Review System · 로컬 처리 (정산서·PDF는 브라우저에서 파싱) · AI 추출은 서버를 경유하여 키 노출 없음</footer>
 
 <script type="module">
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
@@ -340,18 +348,33 @@ function containsAmount(haystack, needle) {
   return re.test(haystack);
 }
 
-// 인보이스 토큰화: "24.09.03331" → ["24","09","03331","240903331"], "DFC3-RLDN-808" → ["DFC3","RLDN","808"]
+// 일반 단어 (회사명 접미어, 공통 어휘) — 매칭에서 제외
+const STOP_TOKENS = new Set(['ltd','inc','co','corp','company','limited','llc','plc','gmbh','sa','pte','group','holdings','international','global','services','solutions','the','and','of','for']);
+
+// 인보이스 토큰화: "24.09.03331" → ["03331","240903331"], "DFC3-RLDN-808" → ["DFC3","RLDN","808"]
+// 4자 미만 또는 전부 0/숫자나열은 제외 (예: "011","000","26")
 function invoiceTokens(inv) {
   const s = String(inv || '').trim();
   if (!s) return [];
-  const split = s.split(/[\s/\-_.,&|]+/).filter(t => t.length >= 2);
+  const split = s.split(/[\s/\-_.,&|]+/).filter(t => t.length >= 3);
   const flat = s.replace(/[^A-Za-z0-9]/g, '');
-  const tokens = new Set(split.map(t => t.toLowerCase()));
-  if (flat.length >= 4) tokens.add(flat.toLowerCase());
-  // 숫자 꼬리(끝 4~6자리) 추가
+  const tokens = new Set();
+  for (const t of split) {
+    const lc = t.toLowerCase();
+    if (lc.length < 3) continue;
+    if (/^0+$/.test(t)) continue;            // "000" 제외
+    if (/^\d{1,3}$/.test(t)) continue;       // 3자 이하 순수 숫자 제외 (날짜·짧은 코드)
+    tokens.add(lc);
+  }
+  if (flat.length >= 6) tokens.add(flat.toLowerCase()); // 6자 이상 평탄형만
   const digits = s.replace(/\D/g, '');
-  if (digits.length >= 4) tokens.add(digits.slice(-Math.min(6, digits.length)));
+  if (digits.length >= 5) tokens.add(digits.slice(-Math.min(6, digits.length))); // 끝자리 5+
   return Array.from(tokens);
+}
+
+// 벤더 토큰 (STOP_TOKENS 제외, 3자 이상)
+function vendorTokens(v) {
+  return normTokens(v).filter(t => t.length >= 3 && !STOP_TOKENS.has(t));
 }
 
 // 핵심 매칭 — 다중 신호(파일명 + 내용) 종합 점수
@@ -409,14 +432,13 @@ function scoreFor(row, pdf) {
     }
   }
 
-  // [3] 벤더명 토큰 매칭
+  // [3] 벤더명 토큰 매칭 (STOP_TOKENS 제외)
   if (row.vendor) {
-    const vTokens = normTokens(row.vendor);
+    const vTokens = vendorTokens(row.vendor);
     if (vTokens.length) {
       const exNames = (ex.vendor_names || []).map(n => normFlat(n).toLowerCase());
       let venHits = [];
       for (const t of vTokens) {
-        if (t.length < 3) continue;
         if (textFlat.includes(t)) { venHits.push(t); continue; }
         if (exNames.some(n => n.includes(t))) venHits.push(t);
       }
@@ -479,14 +501,11 @@ function findPdfForRow(row, pdfs) {
   const best = scored[0];
   if (!best || best.score < 0.5) return null; // 최소 신뢰도
 
-  // 중복 후보: 다른 PDF인데도 자체 점수가 임계값 이상이고,
-  // **파일명에 금액**이 있거나 (가장 강한 신호) **본문+추출**이 모두 일치하는 경우만 중복으로 본다.
-  // 단순히 본문 어딘가에 숫자가 등장하거나 추출 금액 중 하나가 우연히 같은 건 제외.
-  const sameAmtCandidates = scored.filter(s => {
-    if (s.idx === best.idx) return false;
-    if (s.score < 0.5) return false;
-    return s.amtNameHit || (s.amtExHit && s.amtTextHit);
-  });
+  // 중복 후보: 다른 PDF의 **파일명에 정확히 동일 금액**이 들어있는 경우만.
+  // (본문 substring·Gemini 라인아이템 추출은 false positive가 너무 많아 제외)
+  const sameAmtCandidates = scored.filter(s =>
+    s.idx !== best.idx && s.amtNameHit && s.score >= 0.5
+  );
 
   return {
     ...best.pdf,
@@ -601,75 +620,75 @@ function renderResult(findings, pdfs) {
     const url = urlFor(f.pdf);
     const expected = f.row.debit;
     const cur = f.row.currency;
+    const dupCount = (f.pdf?._duplicatePdfs?.length) || 0;
 
-    // 매칭 상태 결정
-    let verdict, vCls, vLabel;
-    if (!f.pdf) { verdict='MISSING'; vCls='muted'; vLabel='증빙 미발견'; }
-    else if (f.pdf._duplicateIndexes && f.pdf._duplicateIndexes.length) { verdict='DUP'; vCls='warn'; vLabel='중복 인보이스 검증필요'; }
-    else { verdict='OK'; vCls='ok'; vLabel='금액 일치'; }
+    let vCls, vLabel;
+    if (!f.pdf) { vCls='muted'; vLabel='증빙 미발견'; }
+    else if (dupCount > 0) { vCls='warn'; vLabel='중복 검증'; }
+    else { vCls='ok'; vLabel='일치'; }
 
     const invOk = f.pdf?._invoiceOk;
     const venOk = f.pdf?._vendorOk;
-    const invBadge = invOk===true ? '<span class="optTag ok">✓ 인보이스 일치</span>'
-                   : invOk===false ? '<span class="optTag err">✗ 인보이스 불일치</span>'
-                   : '<span class="optTag muted">— 인보이스 정보 없음</span>';
-    const venBadge = venOk===true ? '<span class="optTag ok">✓ 벤더명 일치</span>'
-                   : venOk===false ? '<span class="optTag err">✗ 벤더명 불일치</span>'
-                   : '<span class="optTag muted">— 벤더명 정보 없음</span>';
+    const invBadge = invOk===true ? '<span class="optTag ok">INV ✓</span>'
+                   : invOk===false ? '<span class="optTag err">INV ✗</span>'
+                   : '<span class="optTag muted">INV —</span>';
+    const venBadge = venOk===true ? '<span class="optTag ok">VENDOR ✓</span>'
+                   : venOk===false ? '<span class="optTag err">VENDOR ✗</span>'
+                   : '<span class="optTag muted">VENDOR —</span>';
 
-    const dupHtml = f.pdf?._duplicatePdfs?.length ?
-      `<div class="dupHtml">⚠️ 동일 금액의 다른 PDF ${f.pdf._duplicatePdfs.length}건과 함께 검증 필요:<br>${
-        f.pdf._duplicatePdfs.map(d => `· #${d.idx} ${esc(d.name)}`).join('<br>')
-      }</div>` : '';
+    const dupHtml = dupCount > 0 ?
+      `<div class="dupHtml">동일 금액 PDF ${dupCount}건:<br>${
+        f.pdf._duplicatePdfs.map(d => `· #${d.idx} ${esc(d.name)} (신뢰도 ${(d.score*100).toFixed(0)}%)`).join('<br>')
+      }</div>` : '<span style="color:var(--muted);font-size:.78rem;">—</span>';
 
-    const trCls = verdict==='OK' ? 'ok' : verdict==='DUP' ? 'warn' : '';
+    const trCls = !f.pdf ? '' : dupCount > 0 ? 'warn' : 'ok';
 
     return `<tr class="${trCls}">
-      <td class="num">${i+1}</td>
+      <td class="idx">${i+1}</td>
       <td>${esc(f.row.invoice)||'<span style="color:var(--muted)">—</span>'}</td>
       <td>${esc(f.row.vendor)||'<span style="color:var(--muted)">—</span>'}</td>
-      <td class="num">${fmtAmt(expected, cur)}</td>
-      <td class="num">${f.pdf ? fmtAmt(expected, cur) : '<span style="color:var(--muted)">—</span>'}</td>
-      <td>
-        <span class="tag ${vCls}">${vLabel}</span>
-        <div class="optWrap">${invBadge} ${venBadge}</div>
-        ${dupHtml}
-      </td>
+      <td class="num">${fmtAmt(expected, '')}</td>
+      <td class="num" style="color:var(--muted);">${esc(cur)||'—'}</td>
+      <td><span class="tag ${vCls}">${vLabel}</span></td>
+      <td><div class="optWrap">${invBadge}${venBadge}</div></td>
       <td>${f.pdf ? `
         <a class="pdfLink" href="${url}" target="_blank">${esc(f.pdf.name)}</a>
         <div class="matchInfo">신뢰도 ${(f.pdf._matchScore*100).toFixed(0)}% · ${esc((f.pdf._matchReasons||[]).join(' · '))}</div>
       ` : '<span style="color:var(--muted)">금액 일치 PDF 없음</span>'}</td>
+      <td>${dupHtml}</td>
     </tr>`;
   }).join('');
 
   result.innerHTML = `
     <section class="card">
-      <h2>📊 검토 결과 요약</h2>
-      <div class="summary">
-        <div class="sbox ok"><div class="v">${counts.OK||0}</div><div class="l">금액 일치</div></div>
-        <div class="sbox warn"><div class="v">${counts.DUP||0}</div><div class="l">중복 인보이스 검증필요</div></div>
-        <div class="sbox err"><div class="v">${counts.MISSING||0}</div><div class="l">증빙 미발견</div></div>
-        <div class="sbox"><div class="v">${findings.length}</div><div class="l">전체 행수</div></div>
-      </div>
-      ${counts.MISSING ? '<div class="banner warn">⚠️ 증빙 미발견 항목이 있습니다. 관리사에 확인 요청 필요.</div>' : (counts.DUP ? '<div class="banner warn">📌 동일 금액 PDF가 여러 건인 항목은 인보이스/벤더명으로 추가 검증 필요.</div>' : '<div class="banner ok">✓ 모든 행이 증빙 금액과 일치합니다.</div>')}
+      <div class="head"><h2>STEP 3 · 검토 결과</h2><div class="meta">총 ${findings.length} 행 · DEBIT만 검토</div></div>
+      <div class="body">
+        <div class="summary">
+          <div class="sbox ok"><div class="l">금액 일치</div><div class="v">${counts.OK||0}</div></div>
+          <div class="sbox warn"><div class="l">중복 검증 필요</div><div class="v">${counts.DUP||0}</div></div>
+          <div class="sbox err"><div class="l">증빙 미발견</div><div class="v">${counts.MISSING||0}</div></div>
+          <div class="sbox"><div class="l">전체 행수</div><div class="v">${findings.length}</div></div>
+        </div>
+        ${counts.MISSING ? '<div class="banner warn">증빙 미발견 항목이 있습니다. 관리사에 확인 요청 필요.</div>' : (counts.DUP ? '<div class="banner warn">동일 금액 PDF가 여러 건인 항목은 인보이스/벤더명으로 추가 검증 필요.</div>' : '<div class="banner ok">모든 행이 증빙 금액과 일치합니다.</div>')}
 
-      <div class="tableWrap">
-        <table class="resTable">
-          <thead><tr>
-            <th>#</th>
-            <th>INVOICE NO.</th>
-            <th>VENDOR</th>
-            <th style="text-align:right;">정산서 금액(E열)</th>
-            <th style="text-align:right;">증빙 금액</th>
-            <th>판정 및 옵션 검증</th>
-            <th>증빙 PDF</th>
-          </tr></thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div>
+        <div class="tableWrap">
+          <table class="resTable">
+            <thead><tr>
+              <th style="width:38px;">#</th>
+              <th style="min-width:160px;">Invoice No.</th>
+              <th style="min-width:180px;">Vendor</th>
+              <th style="text-align:right;width:120px;">정산서 금액</th>
+              <th style="text-align:right;width:60px;">CUR</th>
+              <th style="width:90px;">판정</th>
+              <th style="min-width:180px;">옵션 검증</th>
+              <th style="min-width:260px;">증빙 PDF / 매칭 근거</th>
+              <th style="min-width:200px;">중복 후보</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
 
-      <div class="note" style="margin-top:14px;">
-        ※ 정산서 금액은 LOCAL(P열)이 있으면 우선 사용, 없으면 DEBIT(E열). 증빙 금액은 PDF에서 추출한 값 또는 부분 전표 표시 금액.
+        <div class="note">※ E열(Cat-I) = DEBIT 행만 검토. ASSET·CREDIT 자동 제외. 매칭 기준: 정산서 금액(P열) vs PDF 파일명/본문/추출 금액. 인보이스(L열)·벤더(J열)는 옵션 검증.</div>
       </div>
     </section>
   `;
