@@ -247,24 +247,23 @@ async function parseXlsx(file) {
   const wb = XLSX.read(buf, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
-  // E=4 I=8 J=9 O=14 P=15  (0-based)
+  // Cat-I=4 (DEBIT/ASSET) · Vendor Name=9 (J) · Invoice No=11 (L) · Currency=14 (O) · Local Amount=15 (P)
   const rows = [];
   for (let i = 0; i < arr.length; i++) {
     const r = arr[i]; if (!r) continue;
-    const debit = String(r[4] ?? '').replace(/[,\s원]/g,'');
-    const debitN = parseFloat(debit);
-    const invoice = String(r[8] ?? '').trim();
+    const catI = String(r[4] ?? '').trim().toUpperCase();
+    if (catI !== 'DEBIT') continue; // DEBIT만 검토
     const vendor = String(r[9] ?? '').trim();
+    const invoice = String(r[11] ?? '').trim();
     const currency = String(r[14] ?? '').trim();
-    const localRaw = String(r[15] ?? '').replace(/[,\s원]/g,'');
-    const localN = parseFloat(localRaw);
-    if (!invoice && !vendor && (!debitN || isNaN(debitN))) continue;
-    if (isNaN(debitN) && isNaN(localN)) continue;
+    const amtRaw = String(r[15] ?? '').replace(/[,\s원]/g, '');
+    const amount = parseFloat(amtRaw);
+    if (isNaN(amount)) continue;
     rows.push({
       rowIdx: i + 1,
-      debit: isNaN(debitN) ? null : debitN,
+      debit: amount,         // E열=DEBIT 비용(P열 금액)
       invoice, vendor, currency,
-      localAmt: isNaN(localN) ? null : localN
+      localAmt: amount
     });
   }
   return rows;
@@ -308,78 +307,173 @@ function amountEquals(a, b) {
   if (a == null || b == null) return false;
   const diff = Math.abs(a - b);
   if (diff < 0.01) return true;
-  return diff / Math.max(Math.abs(a), Math.abs(b), 1) < 0.005; // 0.5% 이내
+  return diff / Math.max(Math.abs(a), Math.abs(b), 1) < 0.005;
 }
 
-// PDF 추출 결과에서 정산서 금액과 같은 금액이 있는지
-function pdfHasAmount(pdf, expected) {
-  const amts = (pdf.extracted?.amounts) || [];
-  return amts.some(a => amountEquals(a.value, expected));
+// 금액 문자열 변형들 — 자료 분석 기반: "484", "80,064", "86,921.83" 등
+function amountVariants(amt) {
+  const ints = Math.round(amt);
+  const variants = new Set();
+  variants.add(String(ints));
+  variants.add(ints.toLocaleString('en-US'));
+  if (Math.abs(amt - ints) > 0.001) {
+    variants.add(amt.toFixed(2));
+    variants.add(Number(amt).toLocaleString('en-US', { minimumFractionDigits: 2 }));
+  }
+  return Array.from(variants).filter(v => v.length >= 2);
 }
 
-// 인보이스 번호 일치 여부 (yes/no/null)
-function invoiceMatched(row, pdf) {
-  if (!row.invoice) return null;
-  const ex = pdf.extracted?.invoice_numbers || [];
-  if (!ex.length) return false;
-  const rowInv = normFlat(row.invoice);
-  const rowDigits = rowInv.replace(/\D/g, '');
-  for (const inv of ex) {
-    const recInv = normFlat(inv);
-    if (!recInv) continue;
-    if (rowInv === recInv) return true;
-    if (rowInv.includes(recInv) || recInv.includes(rowInv)) return true;
-    if (rowDigits.length >= 4) {
-      const recDigits = recInv.replace(/\D/g, '');
-      const tail = rowDigits.slice(-Math.min(6, rowDigits.length));
-      if (recDigits.endsWith(tail)) return true;
+// 인보이스 토큰화: "24.09.03331" → ["24","09","03331","240903331"], "DFC3-RLDN-808" → ["DFC3","RLDN","808"]
+function invoiceTokens(inv) {
+  const s = String(inv || '').trim();
+  if (!s) return [];
+  const split = s.split(/[\s/\-_.,&|]+/).filter(t => t.length >= 2);
+  const flat = s.replace(/[^A-Za-z0-9]/g, '');
+  const tokens = new Set(split.map(t => t.toLowerCase()));
+  if (flat.length >= 4) tokens.add(flat.toLowerCase());
+  // 숫자 꼬리(끝 4~6자리) 추가
+  const digits = s.replace(/\D/g, '');
+  if (digits.length >= 4) tokens.add(digits.slice(-Math.min(6, digits.length)));
+  return Array.from(tokens);
+}
+
+// 핵심 매칭 — 다중 신호(파일명 + 내용) 종합 점수
+function scoreFor(row, pdf) {
+  const reasons = [];
+  let score = 0;
+  const nameLow = pdf.name.toLowerCase();
+  const nameFlat = normFlat(pdf.name);
+  const text = pdf.text || '';
+  const textLow = text.toLowerCase();
+  const textFlat = normFlat(text);
+  const ex = pdf.extracted || {};
+
+  // [1] 금액 매칭 — 가장 강한 신호
+  const expected = row.debit;
+  const variants = amountVariants(expected);
+  let amtNameHit = false, amtTextHit = false, amtExHit = false;
+  for (const v of variants) {
+    if (!amtNameHit && pdf.name.includes(v)) { amtNameHit = true; }
+    if (!amtTextHit && text.includes(v)) { amtTextHit = true; }
+  }
+  if ((ex.amounts || []).some(a => amountEquals(a.value, expected))) amtExHit = true;
+
+  if (amtNameHit) { score += 0.8; reasons.push('파일명에 금액 ' + Math.round(expected) + ' 포함'); }
+  if (amtExHit)   { score += 0.6; reasons.push('PDF 추출 금액에 정확 일치'); }
+  else if (amtTextHit) { score += 0.5; reasons.push('PDF 본문에 금액 ' + Math.round(expected) + ' 포함'); }
+
+  // [2] 인보이스 번호 토큰 매칭
+  const invTokens = invoiceTokens(row.invoice);
+  if (invTokens.length) {
+    let nameInvHits = [], textInvHits = [], exInvHits = [];
+    for (const t of invTokens) {
+      if (t.length < 2) continue;
+      const tFlat = normFlat(t);
+      if (tFlat.length < 2) continue;
+      if (nameFlat.includes(tFlat)) nameInvHits.push(t);
+      if (textFlat.includes(tFlat)) textInvHits.push(t);
+      if ((ex.invoice_numbers || []).some(x => normFlat(x).includes(tFlat) || tFlat.includes(normFlat(x)))) {
+        exInvHits.push(t);
+      }
+    }
+    if (nameInvHits.length) {
+      const ratio = Math.min(1, nameInvHits.length / Math.max(1, invTokens.length));
+      score += 0.7 * ratio;
+      reasons.push(`파일명에 인보이스 토큰 ${nameInvHits.length}/${invTokens.length} 일치(${nameInvHits.slice(0,3).join(', ')})`);
+    }
+    if (exInvHits.length) {
+      score += 0.5; reasons.push(`PDF에서 추출된 인보이스에 토큰 일치(${exInvHits.slice(0,2).join(', ')})`);
+    } else if (textInvHits.length) {
+      const ratio = Math.min(1, textInvHits.length / Math.max(1, invTokens.length));
+      score += 0.4 * ratio;
+      reasons.push(`PDF 본문에 인보이스 토큰 ${textInvHits.length}/${invTokens.length} 일치(${textInvHits.slice(0,3).join(', ')})`);
     }
   }
-  return false;
+
+  // [3] 벤더명 토큰 매칭
+  if (row.vendor) {
+    const vTokens = normTokens(row.vendor);
+    if (vTokens.length) {
+      const exNames = (ex.vendor_names || []).map(n => normFlat(n).toLowerCase());
+      let venHits = [];
+      for (const t of vTokens) {
+        if (t.length < 3) continue;
+        if (textFlat.includes(t)) { venHits.push(t); continue; }
+        if (exNames.some(n => n.includes(t))) venHits.push(t);
+      }
+      if (venHits.length) {
+        const ratio = venHits.length / vTokens.length;
+        score += 0.3 * ratio;
+        reasons.push(`벤더명 토큰 ${venHits.length}/${vTokens.length} 일치(${venHits.slice(0,3).join(', ')})`);
+      }
+    }
+  }
+
+  // [4] 통화 일치 (약한 가중)
+  if (row.currency) {
+    const cur = row.currency.toUpperCase();
+    if (textLow.includes(cur.toLowerCase()) ||
+        (ex.amounts || []).some(a => (a.currency || '').toUpperCase() === cur)) {
+      score += 0.1; reasons.push('통화 ' + cur + ' 일치');
+    }
+  }
+
+  return { score, reasons, amtNameHit, amtExHit, amtTextHit };
 }
 
-// 벤더명 일치 여부 (yes/no/null)
+function invoiceMatched(row, pdf) {
+  if (!row.invoice) return null;
+  const tokens = invoiceTokens(row.invoice).filter(t => t.length >= 3);
+  if (!tokens.length) return null;
+  const nameFlat = normFlat(pdf.name);
+  const textFlat = normFlat(pdf.text || '');
+  const exNorm = (pdf.extracted?.invoice_numbers || []).map(x => normFlat(x));
+  return tokens.some(t => {
+    const tf = normFlat(t);
+    if (tf.length < 3) return false;
+    if (nameFlat.includes(tf) || textFlat.includes(tf)) return true;
+    return exNorm.some(x => x.includes(tf) || tf.includes(x));
+  });
+}
+
 function vendorMatched(row, pdf) {
   if (!row.vendor) return null;
-  const ex = pdf.extracted?.vendor_names || [];
-  if (!ex.length) return false;
-  const rowTokens = normTokens(row.vendor);
-  if (!rowTokens.length) return false;
-  for (const vn of ex) {
-    const recTokens = normTokens(vn);
-    const hits = rowTokens.filter(t => recTokens.some(r => r.includes(t) || t.includes(r)));
-    // 토큰의 절반 이상 일치 또는 핵심 토큰 1개 이상 일치
-    if (hits.length >= Math.max(1, Math.ceil(rowTokens.length / 2))) return true;
-  }
-  return false;
+  const vTokens = normTokens(row.vendor).filter(t => t.length >= 3);
+  if (!vTokens.length) return null;
+  const textFlat = normFlat(pdf.text || '');
+  const exNorm = (pdf.extracted?.vendor_names || []).map(x => normFlat(x));
+  const hits = vTokens.filter(t =>
+    textFlat.includes(t) || exNorm.some(x => x.includes(t))
+  );
+  return hits.length >= Math.max(1, Math.ceil(vTokens.length / 2));
 }
 
-// 핵심: E열 DEBIT 금액으로 1차 매칭. 동일 금액 PDF 여럿이면 첫 번째 + 중복 표시.
+// 매칭 알고리즘: 점수 기반 + 동일 금액 PDF는 중복 후보로 표시
 function findPdfForRow(row, pdfs) {
   if (!pdfs.length) return null;
-  const expected = row.debit; // E열 DEBIT만 기준
+  const expected = row.debit;
   if (expected == null || isNaN(expected)) return null;
 
-  // 금액 일치하는 PDF 모두 수집
-  const amountHits = pdfs
-    .map((p, idx) => ({ pdf: p, idx, hit: pdfHasAmount(p, expected) }))
-    .filter(x => x.hit);
+  const scored = pdfs.map((p, idx) => ({ pdf: p, idx, ...scoreFor(row, p) }))
+    .sort((a, b) => b.score - a.score);
 
-  if (!amountHits.length) return null;
+  const best = scored[0];
+  if (!best || best.score < 0.5) return null; // 최소 신뢰도
 
-  // 첫 번째를 메인 매칭으로
-  const main = amountHits[0];
-  const duplicates = amountHits.slice(1);
-  const invOk = invoiceMatched(row, main.pdf);
-  const venOk = vendorMatched(row, main.pdf);
+  // 금액으로 일치하는 PDF들을 중복 후보로 식별 (파일명/추출/본문 중 어느 하나라도)
+  const sameAmtCandidates = scored.filter(s =>
+    s.idx !== best.idx && (s.amtNameHit || s.amtExHit || s.amtTextHit)
+  );
 
   return {
-    ...main.pdf,
+    ...best.pdf,
     _matchedAmount: expected,
-    _invoiceOk: invOk,
-    _vendorOk: venOk,
-    _duplicateIndexes: duplicates.map(d => d.idx + 1), // 1-base
-    _duplicatePdfs: duplicates.map(d => ({ name: d.pdf.name, idx: d.idx + 1 }))
+    _matchScore: best.score,
+    _matchReasons: best.reasons,
+    _invoiceOk: invoiceMatched(row, best.pdf),
+    _vendorOk: vendorMatched(row, best.pdf),
+    _duplicateIndexes: sameAmtCandidates.map(d => d.idx + 1),
+    _duplicatePdfs: sameAmtCandidates.map(d => ({ name: d.pdf.name, idx: d.idx + 1, score: d.score }))
   };
 }
 
@@ -518,7 +612,10 @@ function renderResult(findings, pdfs) {
         <div class="optWrap">${invBadge} ${venBadge}</div>
         ${dupHtml}
       </td>
-      <td>${f.pdf ? `<a class="pdfLink" href="${url}" target="_blank">${esc(f.pdf.name)}</a>` : '<span style="color:var(--muted)">금액 일치 PDF 없음</span>'}</td>
+      <td>${f.pdf ? `
+        <a class="pdfLink" href="${url}" target="_blank">${esc(f.pdf.name)}</a>
+        <div class="matchInfo">신뢰도 ${(f.pdf._matchScore*100).toFixed(0)}% · ${esc((f.pdf._matchReasons||[]).join(' · '))}</div>
+      ` : '<span style="color:var(--muted)">금액 일치 PDF 없음</span>'}</td>
     </tr>`;
   }).join('');
 
