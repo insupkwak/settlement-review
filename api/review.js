@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
-  const { row, pdfText } = body || {};
+  const { row, pdfText, extracted } = body || {};
   if (!row) return res.status(400).json({ error: 'row 누락' });
 
   const sys = `당신은 선주사 회계감독을 돕는 정산 검토 어시스턴트입니다.
@@ -50,15 +50,24 @@ note는 1~3문장으로 **불일치의 정확한 원인**을 구체적으로 설
   "note": "한국어 1~3문장, 구체적 수치 포함"
 }`;
 
+  const exBlock = extracted ? `
+[증빙 PDF에서 사전 추출된 구조화 정보]
+- 인보이스 번호 후보: ${JSON.stringify(extracted.invoice_numbers || [])}
+- 벤더 이름 후보: ${JSON.stringify(extracted.vendor_names || [])}
+- 금액 후보: ${JSON.stringify(extracted.amounts || [])}
+- 날짜: ${JSON.stringify(extracted.dates || [])}
+- 추출 비고: ${extracted.notes || ''}
+` : '';
+
   const user = `[정산서 1행]
 - INVOICE NO.: ${row.invoice || '(없음)'}
 - VENDOR NAME: ${row.vendor || '(없음)'}
 - DEBIT: ${row.debit ?? '(없음)'}
 - CURRENCY: ${row.currency || '(없음)'}
 - LOCAL 비용: ${row.localAmt ?? '(없음)'}
-
-[증빙 PDF 텍스트]
-${pdfText ? String(pdfText).slice(0, 12000) : '(증빙 없음 또는 텍스트 추출 실패)'}`;
+${exBlock}
+[증빙 PDF 원문 텍스트]
+${pdfText ? String(pdfText).slice(0, 10000) : '(텍스트 추출 실패)'}`;
 
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
