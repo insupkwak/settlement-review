@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>정산서 검토 시스템 - 선주사 감독용</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+<style>
+:root{
+  --bg:#0b1220;--card:#111c34;--card2:#1a2649;--border:#2a3a66;
+  --text:#e2e8f0;--muted:#94a3b8;
+  --accent:#3b82f6;--accent2:#60a5fa;
+  --ok:#22c55e;--warn:#f59e0b;--err:#ef4444;
+  --gold:#fbbf24;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Malgun Gothic',sans-serif;line-height:1.5;}
+header{background:linear-gradient(135deg,#0f172a,#1e293b);padding:28px 24px;border-bottom:1px solid var(--border);text-align:center;}
+header h1{font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:6px;}
+header p{color:var(--muted);font-size:.92rem;}
+main{max-width:1280px;margin:0 auto;padding:24px 20px 60px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:18px;}
+.card h2{font-size:1.1rem;font-weight:800;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
+.step{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px;}
+.step .n{width:30px;height:30px;border-radius:50%;background:var(--border);color:var(--muted);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;}
+.step.active{border-color:var(--accent);}
+.step.active .n{background:var(--accent);color:#fff;}
+.step.done .n{background:var(--ok);color:#fff;}
+.step .lbl{font-weight:600;font-size:.92rem;}
+@media(max-width:680px){.steps{grid-template-columns:1fr;}}
+
+label{display:block;font-size:.88rem;font-weight:600;color:var(--text);margin-bottom:6px;}
+.hint{font-size:.78rem;color:var(--muted);margin-top:4px;}
+input[type=password],input[type=text]{
+  width:100%;background:var(--card2);border:2px solid var(--border);border-radius:10px;
+  padding:11px 14px;color:var(--text);font-size:.95rem;outline:none;
+}
+input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:720px){.row2{grid-template-columns:1fr;}}
+
+.drop{
+  background:var(--card2);border:2px dashed var(--border);border-radius:12px;
+  padding:24px 16px;text-align:center;cursor:pointer;transition:all .15s ease;
+}
+.drop:hover{border-color:var(--accent);background:rgba(59,130,246,.06);}
+.drop.has{border-color:var(--ok);background:rgba(34,197,94,.06);border-style:solid;}
+.drop .ic{font-size:2.2rem;margin-bottom:6px;}
+.drop .ttl{font-weight:700;font-size:.98rem;margin-bottom:4px;color:#fff;}
+.drop .sub{font-size:.8rem;color:var(--muted);}
+.drop input[type=file]{display:none;}
+.fileLabel{display:inline-flex;align-items:center;gap:8px;background:rgba(34,197,94,.15);color:#86efac;padding:7px 14px;border-radius:20px;font-size:.86rem;font-weight:600;margin-top:8px;}
+
+.btn{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;border:none;border-radius:12px;padding:13px 24px;
+  font-size:1rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(59,130,246,.4);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn.full{width:100%;justify-content:center;padding:15px;font-size:1.05rem;}
+.btn.warn{background:linear-gradient(135deg,#f59e0b,#d97706);}
+
+.progress{margin-top:12px;background:var(--card2);border-radius:10px;padding:12px 16px;font-size:.88rem;color:var(--muted);}
+.progress .bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:8px;}
+.progress .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));width:0%;transition:width .25s ease;}
+
+/* 결과 */
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+@media(max-width:720px){.summary{grid-template-columns:repeat(2,1fr);}}
+.sbox{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;}
+.sbox .v{font-size:1.5rem;font-weight:800;color:#fff;}
+.sbox .l{font-size:.78rem;color:var(--muted);margin-top:2px;font-weight:600;}
+.sbox.ok{border-color:rgba(34,197,94,.5);} .sbox.ok .v{color:var(--ok);}
+.sbox.warn{border-color:rgba(245,158,11,.5);} .sbox.warn .v{color:var(--warn);}
+.sbox.err{border-color:rgba(239,68,68,.5);} .sbox.err .v{color:var(--err);}
+
+.resTable{width:100%;border-collapse:collapse;font-size:.88rem;background:var(--card2);border-radius:10px;overflow:hidden;}
+.resTable th,.resTable td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top;}
+.resTable th{background:#0f172a;color:#fff;font-weight:700;font-size:.82rem;letter-spacing:.3px;position:sticky;top:0;}
+.resTable tr:last-child td{border-bottom:none;}
+.resTable td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.resTable tr.ok{background:rgba(34,197,94,.05);}
+.resTable tr.warn{background:rgba(245,158,11,.07);}
+.resTable tr.err{background:rgba(239,68,68,.07);}
+.tag{display:inline-block;padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;letter-spacing:.4px;white-space:nowrap;}
+.tag.ok{background:rgba(34,197,94,.18);color:#86efac;}
+.tag.warn{background:rgba(245,158,11,.18);color:#fcd34d;}
+.tag.err{background:rgba(239,68,68,.18);color:#fca5a5;}
+.tag.muted{background:var(--border);color:var(--muted);}
+.tableWrap{overflow:auto;max-height:75vh;border:1px solid var(--border);border-radius:10px;}
+.note{font-size:.78rem;color:var(--muted);margin-top:6px;line-height:1.5;}
+.pdfLink{color:var(--accent2);text-decoration:none;font-size:.78rem;}
+.pdfLink:hover{text-decoration:underline;}
+
+.detail{font-size:.8rem;color:var(--muted);margin-top:4px;white-space:pre-wrap;word-break:break-word;}
+details.adv{margin-top:6px;font-size:.82rem;}
+details.adv summary{cursor:pointer;color:var(--accent2);font-weight:600;}
+details.adv .body{margin-top:6px;background:#0b1220;padding:8px 10px;border-radius:6px;color:var(--muted);font-family:Consolas,monospace;font-size:.78rem;white-space:pre-wrap;max-height:200px;overflow:auto;}
+
+.banner{padding:12px 16px;border-radius:10px;margin-bottom:12px;font-size:.9rem;}
+.banner.info{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.4);color:#bfdbfe;}
+.banner.err{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#fecaca;}
+.banner.warn{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:#fde68a;}
+.banner.ok{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.4);color:#bbf7d0;}
+
+footer{text-align:center;color:var(--muted);font-size:.78rem;padding:20px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📋 정산서 검토 시스템</h1>
+  <p>선주사 감독용 · 정산서(Excel) ↔ 증빙(PDF) 자동 대조</p>
+</header>
+
+<main>
+  <div class="steps">
+    <div class="step active" id="step1"><div class="n">1</div><div class="lbl">API 키 + 파일 업로드</div></div>
+    <div class="step" id="step2"><div class="n">2</div><div class="lbl">대조 검토</div></div>
+    <div class="step" id="step3"><div class="n">3</div><div class="lbl">결과 확인</div></div>
+  </div>
+
+  <section class="card">
+    <h2>🔑 STEP 1 · 설정 및 파일 업로드</h2>
+
+    <div class="banner info" style="margin-bottom:14px;">
+      🔒 AI 키는 서버(.env)에 안전하게 보관됩니다. 별도 입력이 필요하지 않습니다.
+    </div>
+
+    <div class="row2">
+      <div>
+        <label>📊 정산서 (Excel)</label>
+        <div class="drop" id="dropXlsx" onclick="document.getElementById('fileXlsx').click()">
+          <div class="ic">📊</div>
+          <div class="ttl">Excel 파일 선택</div>
+          <div class="sub">관리사 정산서 (.xlsx, .xls)</div>
+          <input type="file" id="fileXlsx" accept=".xlsx,.xls">
+          <div id="xlsxName"></div>
+        </div>
+      </div>
+      <div>
+        <label>📦 증빙 (ZIP)</label>
+        <div class="drop" id="dropZip" onclick="document.getElementById('fileZip').click()">
+          <div class="ic">📦</div>
+          <div class="ttl">ZIP 파일 선택</div>
+          <div class="sub">PDF 증빙 압축 파일 (.zip)</div>
+          <input type="file" id="fileZip" accept=".zip">
+          <div id="zipName"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint" style="margin-top:14px;">
+      Excel 컬럼 매핑 — E: DEBIT 비용 · I: INVOICE NO. · J: VENDOR NAME · O: CURRENCY · P: LOCAL 비용
+    </div>
+  </section>
+
+  <section class="card">
+    <button class="btn full" id="runBtn" disabled>🔍 검토 시작</button>
+    <div class="progress" id="progress" style="display:none;">
+      <div id="progText">준비 중...</div>
+      <div class="bar"><div class="fill" id="progFill"></div></div>
+    </div>
+  </section>
+
+  <div id="result"></div>
+</main>
+
+<footer>© 정산서 검토 시스템 · 로컬 처리 · API 키는 브라우저에만 저장</footer>
+
+<script type="module">
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+window._pdfjs = pdfjsLib;
+</script>
+
+<script>
+const $ = id => document.getElementById(id);
+const fileXlsx = $('fileXlsx'), fileZip = $('fileZip'), runBtn = $('runBtn'), result = $('result');
+
+let xlsxFile = null, zipFile = null;
+
+function bindDrop(dropEl, inputEl, nameEl, setter) {
+  inputEl.addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) {
+      setter(f);
+      dropEl.classList.add('has');
+      nameEl.innerHTML = `<div class="fileLabel">✓ ${f.name}</div>`;
+      updateRunBtn();
+    }
+  });
+  ['dragover','dragenter'].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.style.borderColor='var(--accent)'; }));
+  ['dragleave','drop'].forEach(ev => dropEl.addEventListener(ev, e => { e.preventDefault(); dropEl.style.borderColor=''; }));
+  dropEl.addEventListener('drop', e => {
+    const f = e.dataTransfer.files[0];
+    if (!f) return;
+    inputEl.files = e.dataTransfer.files;
+    inputEl.dispatchEvent(new Event('change'));
+  });
+}
+bindDrop($('dropXlsx'), fileXlsx, $('xlsxName'), f => xlsxFile = f);
+bindDrop($('dropZip'), fileZip, $('zipName'), f => zipFile = f);
+
+function updateRunBtn() {
+  runBtn.disabled = !(xlsxFile && zipFile);
+}
+
+function setProgress(text, pct) {
+  const p = $('progress'); p.style.display = 'block';
+  $('progText').textContent = text;
+  $('progFill').style.width = pct + '%';
+}
+function setStep(n) {
+  for (let i=1;i<=3;i++){
+    const s = $('step'+i);
+    s.classList.toggle('active', i===n);
+    s.classList.toggle('done', i<n);
+  }
+}
+
+function fmtAmt(n, cur) {
+  if (n == null || isNaN(n)) return '—';
+  return n.toLocaleString('ko-KR', { maximumFractionDigits: 2 }) + (cur ? ' ' + cur : '');
+}
+
+async function parseXlsx(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+  // E=4 I=8 J=9 O=14 P=15  (0-based)
+  const rows = [];
+  for (let i = 0; i < arr.length; i++) {
+    const r = arr[i]; if (!r) continue;
+    const debit = String(r[4] ?? '').replace(/[,\s원]/g,'');
+    const debitN = parseFloat(debit);
+    const invoice = String(r[8] ?? '').trim();
+    const vendor = String(r[9] ?? '').trim();
+    const currency = String(r[14] ?? '').trim();
+    const localRaw = String(r[15] ?? '').replace(/[,\s원]/g,'');
+    const localN = parseFloat(localRaw);
+    if (!invoice && !vendor && (!debitN || isNaN(debitN))) continue;
+    if (isNaN(debitN) && isNaN(localN)) continue;
+    rows.push({
+      rowIdx: i + 1,
+      debit: isNaN(debitN) ? null : debitN,
+      invoice, vendor, currency,
+      localAmt: isNaN(localN) ? null : localN
+    });
+  }
+  return rows;
+}
+
+async function unzipPdfs(file) {
+  const zip = await JSZip.loadAsync(file);
+  const pdfs = [];
+  const entries = Object.values(zip.files).filter(f => !f.dir && /\.pdf$/i.test(f.name));
+  for (const e of entries) {
+    const blob = await e.async('blob');
+    pdfs.push({ name: e.name, blob });
+  }
+  return pdfs;
+}
+
+async function pdfToText(blob) {
+  const buf = await blob.arrayBuffer();
+  const pdfjsLib = window._pdfjs;
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    text += content.items.map(it => it.str).join(' ') + '\n';
+  }
+  return text;
+}
+
+function findPdfForRow(row, pdfs) {
+  // 1) 인보이스 번호로 파일명/내용 매칭
+  if (row.invoice) {
+    const inv = row.invoice.replace(/[^A-Za-z0-9]/g,'').toLowerCase();
+    if (inv.length >= 3) {
+      const byName = pdfs.find(p => p.name.replace(/[^A-Za-z0-9]/g,'').toLowerCase().includes(inv));
+      if (byName) return byName;
+      const byText = pdfs.find(p => p.text && p.text.replace(/[^A-Za-z0-9]/g,'').toLowerCase().includes(inv));
+      if (byText) return byText;
+    }
+  }
+  // 2) 벤더명으로 폴백
+  if (row.vendor) {
+    const v = row.vendor.toLowerCase().split(/\s+/)[0];
+    if (v && v.length >= 3) {
+      const byName = pdfs.find(p => p.name.toLowerCase().includes(v));
+      if (byName) return byName;
+    }
+  }
+  return null;
+}
+
+async function aiReview(row, pdfText) {
+  const res = await fetch('/api/review', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ row, pdfText })
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error('서버 검토 실패: ' + res.status + ' ' + t.slice(0,200));
+  }
+  return await res.json();
+}
+
+runBtn.addEventListener('click', async () => {
+  if (!xlsxFile || !zipFile) return;
+  runBtn.disabled = true;
+  result.innerHTML = '';
+  setStep(2);
+  try {
+    setProgress('Excel 파싱 중...', 5);
+    const rows = await parseXlsx(xlsxFile);
+    if (!rows.length) throw new Error('Excel에서 유효한 행을 찾지 못했습니다. (E/I/J/O/P 컬럼 확인)');
+
+    setProgress('ZIP 해제 중...', 12);
+    const pdfs = await unzipPdfs(zipFile);
+    if (!pdfs.length) throw new Error('ZIP 안에 PDF가 없습니다.');
+
+    setProgress(`PDF 텍스트 추출 중... (0/${pdfs.length})`, 15);
+    for (let i = 0; i < pdfs.length; i++) {
+      try { pdfs[i].text = await pdfToText(pdfs[i].blob); }
+      catch (e) { pdfs[i].text = ''; pdfs[i].error = e.message; }
+      setProgress(`PDF 텍스트 추출 중... (${i+1}/${pdfs.length})`, 15 + (i+1) / pdfs.length * 30);
+    }
+
+    const findings = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const pdf = findPdfForRow(row, pdfs);
+      setProgress(`AI 검토 중... (${i+1}/${rows.length}) ${row.invoice || row.vendor || ''}`, 45 + (i+1)/rows.length*50);
+      let ai;
+      if (!pdf) {
+        ai = { verdict:'MISSING', pdf_amount:null, pdf_currency:null, is_partial:false, note:'대응되는 PDF를 찾지 못함 (인보이스 번호/벤더명 매칭 실패)' };
+      } else {
+        try { ai = await aiReview(row, pdf.text); }
+        catch (e) { ai = { verdict:'MISMATCH', pdf_amount:null, pdf_currency:null, is_partial:false, note:'AI 오류: '+e.message }; }
+      }
+      findings.push({ row, pdf, ai });
+    }
+
+    setProgress('완료', 100);
+    setStep(3);
+    renderResult(findings, pdfs);
+  } catch (e) {
+    result.innerHTML = `<div class="banner err">⚠️ ${e.message}</div>`;
+    setProgress('오류', 100);
+  } finally {
+    runBtn.disabled = false;
+  }
+});
+
+function renderResult(findings, pdfs) {
+  const counts = { OK:0, WARN:0, MISMATCH:0, MISSING:0 };
+  findings.forEach(f => counts[f.ai.verdict] = (counts[f.ai.verdict]||0) + 1);
+
+  // PDF blob URL 캐시
+  const urlMap = new Map();
+  const urlFor = pdf => {
+    if (!pdf) return null;
+    if (urlMap.has(pdf.name)) return urlMap.get(pdf.name);
+    const u = URL.createObjectURL(pdf.blob);
+    urlMap.set(pdf.name, u);
+    return u;
+  };
+
+  const rowsHtml = findings.map((f, i) => {
+    const v = f.ai.verdict;
+    const tagCls = v==='OK'?'ok':v==='WARN'?'warn':v==='MISMATCH'?'err':'muted';
+    const trCls = v==='OK'?'ok':v==='WARN'?'warn':v==='MISMATCH'?'err':'';
+    const expected = f.row.localAmt ?? f.row.debit;
+    const cur = f.row.currency;
+    const url = urlFor(f.pdf);
+    return `<tr class="${trCls}">
+      <td class="num">${i+1}</td>
+      <td>${esc(f.row.invoice)||'<span style="color:var(--muted)">—</span>'}</td>
+      <td>${esc(f.row.vendor)||'<span style="color:var(--muted)">—</span>'}</td>
+      <td class="num">${fmtAmt(expected, cur)}</td>
+      <td class="num">${fmtAmt(f.ai.pdf_amount, f.ai.pdf_currency || cur)}${f.ai.is_partial?'<div class="note">부분 전표</div>':''}</td>
+      <td><span class="tag ${tagCls}">${v}</span></td>
+      <td>${f.pdf ? `<a class="pdfLink" href="${url}" target="_blank">${esc(f.pdf.name)}</a>` : '<span style="color:var(--muted)">매칭 없음</span>'}</td>
+      <td><div class="detail">${esc(f.ai.note||'')}</div></td>
+    </tr>`;
+  }).join('');
+
+  result.innerHTML = `
+    <section class="card">
+      <h2>📊 검토 결과 요약</h2>
+      <div class="summary">
+        <div class="sbox ok"><div class="v">${counts.OK||0}</div><div class="l">일치 OK</div></div>
+        <div class="sbox warn"><div class="v">${counts.WARN||0}</div><div class="l">주의 WARN (±5%)</div></div>
+        <div class="sbox err"><div class="v">${counts.MISMATCH||0}</div><div class="l">불일치 MISMATCH</div></div>
+        <div class="sbox"><div class="v">${counts.MISSING||0}</div><div class="l">증빙 누락 MISSING</div></div>
+      </div>
+      ${counts.MISMATCH || counts.MISSING ? '<div class="banner warn">⚠️ 불일치/누락 항목이 있습니다. 관리사에 확인 요청 필요.</div>' : '<div class="banner ok">✓ 전체 항목 정상 또는 경미한 차이만 있습니다.</div>'}
+
+      <div class="tableWrap">
+        <table class="resTable">
+          <thead><tr>
+            <th>#</th>
+            <th>INVOICE NO.</th>
+            <th>VENDOR</th>
+            <th style="text-align:right;">정산서 금액</th>
+            <th style="text-align:right;">증빙 금액</th>
+            <th>판정</th>
+            <th>증빙 PDF</th>
+            <th>AI 코멘트</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+
+      <div class="note" style="margin-top:14px;">
+        ※ 정산서 금액은 LOCAL(P열)이 있으면 우선 사용, 없으면 DEBIT(E열). 증빙 금액은 PDF에서 추출한 값 또는 부분 전표 표시 금액.
+      </div>
+    </section>
+  `;
+}
+
+function esc(s){return String(s??'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);}
+window.fmtAmt = fmtAmt; window.esc = esc;
+</script>
+</body>
+</html>

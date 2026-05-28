@@ -1,0 +1,7 @@
+{
+  "name": "settlement-review",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "정산서 검토 시스템 - 선주사 감독용"
+}

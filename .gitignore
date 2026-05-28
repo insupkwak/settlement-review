@@ -1,0 +1,8 @@
+.env
+.env.local
+.vercel
+node_modules/
+자료/
+.DS_Store
+Thumbs.db
+*.log
