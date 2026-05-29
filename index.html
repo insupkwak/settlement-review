@@ -65,6 +65,7 @@ input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);box
 .btn:hover:not(:disabled){background:var(--accent2);}
 .btn:disabled{opacity:.45;cursor:not-allowed;}
 .btn.full{width:100%;padding:12px;}
+.btn.sm{padding:5px 10px;font-size:.72rem;letter-spacing:.3px;}
 
 .progress{background:var(--alt);border:1px solid var(--line);padding:10px 14px;font-size:.82rem;color:var(--muted);margin-top:10px;}
 .progress .bar{height:5px;background:var(--line2);overflow:hidden;margin-top:6px;}
@@ -74,12 +75,28 @@ input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);box
 .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);background:#fff;margin-bottom:14px;}
 .sbox{padding:14px;border-right:1px solid var(--line);text-align:left;}
 .sbox:last-child{border-right:none;}
-.sbox .l{font-size:.7rem;color:var(--muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;}
-.sbox .v{font-size:1.8rem;font-weight:800;color:var(--head);line-height:1;font-variant-numeric:tabular-nums;}
+.sbox .l{font-size:.76rem;color:var(--muted);font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px;}
+.sbox .v{font-size:1.65rem;font-weight:800;color:var(--head);line-height:1;font-variant-numeric:tabular-nums;}
 .sbox.ok .v{color:var(--ok);}
 .sbox.warn .v{color:var(--warn);}
 .sbox.err .v{color:var(--err);}
 @media(max-width:720px){.summary{grid-template-columns:repeat(2,1fr);}.sbox{border-right:1px solid var(--line);border-bottom:1px solid var(--line);}.sbox:nth-child(2){border-right:none;}.sbox:nth-last-child(-n+2){border-bottom:none;}}
+
+/* 성공률 진행바 */
+.rate{border:1px solid var(--line);background:#fff;padding:12px 16px;margin-bottom:14px;}
+.rate .top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;}
+.rate .lbl{font-size:.76rem;color:var(--muted);font-weight:700;letter-spacing:.4px;text-transform:uppercase;}
+.rate .pct{font-size:1.2rem;font-weight:800;color:var(--ok);font-variant-numeric:tabular-nums;}
+.rate .track{height:12px;background:var(--line2);overflow:hidden;display:flex;}
+.rate .seg-ok{height:100%;background:var(--ok);}
+.rate .seg-warn{height:100%;background:var(--warn);}
+.rate .seg-err{height:100%;background:var(--err);}
+.rate .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:.76rem;color:var(--muted);}
+.rate .legend span{display:inline-flex;align-items:center;gap:5px;}
+.rate .legend i{width:10px;height:10px;display:inline-block;}
+.rate .legend i.ok{background:var(--ok);}
+.rate .legend i.warn{background:var(--warn);}
+.rate .legend i.err{background:var(--err);}
 
 /* 결과 표 */
 .tableWrap{border:1px solid var(--line);background:#fff;overflow:auto;max-height:78vh;}
@@ -90,16 +107,29 @@ input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);box
 .resTable tr:last-child td{border-bottom:none;}
 .resTable tbody tr:nth-child(even){background:var(--alt);}
 .resTable tr.ok{background:#f0fdf4!important;}
-.resTable tr.warn{background:#fffbeb!important;}
-.resTable tr.err{background:#fef2f2!important;}
+.resTable tr.warn{background:#fef3c7!important;}
+.resTable tr.err{background:#fee2e2!important;}
 .resTable td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
 .resTable td.idx{text-align:center;color:var(--muted);width:38px;font-weight:700;}
+/* 상태별 좌측 컬러 바 — 경고/오류/미발견 행 가시성 강화 */
+.resTable tr.ok td.idx{box-shadow:inset 4px 0 0 var(--ok);}
+.resTable tr.warn td.idx{box-shadow:inset 4px 0 0 var(--warn);}
+.resTable tr.err td.idx{box-shadow:inset 4px 0 0 var(--err);}
+.resTable tr.miss td.idx{box-shadow:inset 4px 0 0 var(--muted);}
+/* 모바일: 9컬럼 결과표는 가로 스크롤 유지하며 폰트·패딩 축소 */
+@media(max-width:720px){
+  .tableWrap{-webkit-overflow-scrolling:touch;}
+  .resTable{font-size:.76rem;}
+  .resTable th,.resTable td{padding:6px 7px;}
+  .resTable th{font-size:.68rem;}
+  .matchInfo,.dupHtml{font-size:.76rem;}
+}
 
 .tag{display:inline-block;padding:2px 8px;font-size:.7rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;border:1px solid transparent;}
 .tag.ok{background:var(--okbg);color:var(--ok);border-color:#86efac;}
 .tag.warn{background:var(--warnbg);color:var(--warn);border-color:#fcd34d;}
 .tag.err{background:var(--errbg);color:var(--err);border-color:#fca5a5;}
-.tag.muted{background:#f1f5f9;color:var(--muted);border-color:var(--line);}
+.tag.muted{background:#fee2e2;color:var(--err);border-color:#fca5a5;}
 
 .optWrap{margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;}
 .optTag{display:inline-block;padding:1px 7px;font-size:.7rem;font-weight:600;border:1px solid;}
@@ -107,8 +137,8 @@ input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);box
 .optTag.err{background:var(--errbg);color:var(--err);border-color:#fca5a5;}
 .optTag.muted{background:#f1f5f9;color:var(--muted);border-color:var(--line);}
 
-.dupHtml{margin-top:6px;padding:6px 10px;background:var(--warnbg);border-left:3px solid var(--warn);color:#78350f;font-size:.74rem;line-height:1.5;}
-.matchInfo{font-size:.7rem;color:var(--muted);margin-top:3px;line-height:1.4;}
+.dupHtml{margin-top:6px;padding:7px 10px;background:#fde68a;border-left:4px solid var(--warn);color:#713f12;font-size:.8rem;font-weight:500;line-height:1.55;}
+.matchInfo{font-size:.82rem;color:#475569;margin-top:4px;line-height:1.5;}
 .pdfLink{color:var(--accent);text-decoration:none;font-size:.78rem;font-weight:600;word-break:break-all;}
 .pdfLink:hover{text-decoration:underline;}
 .note{font-size:.74rem;color:var(--muted);margin-top:6px;line-height:1.5;}
@@ -116,7 +146,7 @@ input[type=password]:focus,input[type=text]:focus{border-color:var(--accent);box
 .banner{padding:10px 14px;border-left:4px solid;margin-bottom:12px;font-size:.84rem;font-weight:500;}
 .banner.info{background:var(--infobg);border-left-color:var(--accent);color:var(--info);}
 .banner.err{background:var(--errbg);border-left-color:var(--err);color:var(--err);}
-.banner.warn{background:var(--warnbg);border-left-color:var(--warn);color:var(--warn);}
+.banner.warn{background:#fde68a;border-left-color:var(--warn);color:#713f12;font-weight:600;}
 .banner.ok{background:var(--okbg);border-left-color:var(--ok);color:var(--ok);}
 
 footer{text-align:center;color:var(--muted);font-size:.74rem;padding:18px;border-top:1px solid var(--line);background:#fff;margin-top:30px;}
@@ -205,6 +235,7 @@ const $ = id => document.getElementById(id);
 const fileXlsx = $('fileXlsx'), fileZip = $('fileZip'), runBtn = $('runBtn'), result = $('result');
 
 let xlsxFile = null, zipFile = null;
+let lastFindings = [];   // 내보내기용: 마지막 검토 결과 저장
 
 function bindDrop(dropEl, inputEl, nameEl, setter) {
   inputEl.addEventListener('change', e => {
@@ -382,11 +413,11 @@ function vendorTokens(v) {
 function scoreFor(row, pdf) {
   const reasons = [];
   let score = 0;
-  const nameLow = pdf.name.toLowerCase();
-  const nameFlat = normFlat(pdf.name);
+  const nameLow = pdf._nameLow ?? pdf.name.toLowerCase();
+  const nameFlat = pdf._nameFlat ?? normFlat(pdf.name);
   const text = pdf.text || '';
-  const textLow = text.toLowerCase();
-  const textFlat = normFlat(text);
+  const textLow = pdf._textLow ?? text.toLowerCase();
+  const textFlat = pdf._textFlat ?? normFlat(text);
   const ex = pdf.extracted || {};
 
   // [1] 금액 매칭 — 가장 강한 신호 (단어 경계 인식)
@@ -434,8 +465,9 @@ function scoreFor(row, pdf) {
   else if (amtTextHit && isSmallInteger)  { score += 0.15; reasons.push('PDF 본문에 ' + expected + ' 등장(약한 신호: 소액 정수)'); }
 
   // [2] 인보이스 번호 토큰 매칭
-  const invTokens = invoiceTokens(row.invoice);
+  const invTokens = row._invTokens ?? (row._invTokens = invoiceTokens(row.invoice));
   if (invTokens.length) {
+    const exInvNorm = pdf._exInvNorm ?? (ex.invoice_numbers || []).map(x => normFlat(x));
     let nameInvHits = [], textInvHits = [], exInvHits = [];
     for (const t of invTokens) {
       if (t.length < 2) continue;
@@ -443,7 +475,7 @@ function scoreFor(row, pdf) {
       if (tFlat.length < 2) continue;
       if (nameFlat.includes(tFlat)) nameInvHits.push(t);
       if (textFlat.includes(tFlat)) textInvHits.push(t);
-      if ((ex.invoice_numbers || []).some(x => normFlat(x).includes(tFlat) || tFlat.includes(normFlat(x)))) {
+      if (exInvNorm.some(x => x.includes(tFlat) || tFlat.includes(x))) {
         exInvHits.push(t);
       }
     }
@@ -463,9 +495,9 @@ function scoreFor(row, pdf) {
 
   // [3] 벤더명 토큰 매칭 (STOP_TOKENS 제외)
   if (row.vendor) {
-    const vTokens = vendorTokens(row.vendor);
+    const vTokens = row._venTokens ?? (row._venTokens = vendorTokens(row.vendor));
     if (vTokens.length) {
-      const exNames = (ex.vendor_names || []).map(n => normFlat(n).toLowerCase());
+      const exNames = pdf._exVenNorm ?? (ex.vendor_names || []).map(n => normFlat(n).toLowerCase());
       let venHits = [];
       for (const t of vTokens) {
         if (textFlat.includes(t)) { venHits.push(t); continue; }
@@ -495,9 +527,9 @@ function invoiceMatched(row, pdf) {
   if (!row.invoice) return null;
   const tokens = invoiceTokens(row.invoice).filter(t => t.length >= 3);
   if (!tokens.length) return null;
-  const nameFlat = normFlat(pdf.name);
-  const textFlat = normFlat(pdf.text || '');
-  const exNorm = (pdf.extracted?.invoice_numbers || []).map(x => normFlat(x));
+  const nameFlat = pdf._nameFlat ?? normFlat(pdf.name);
+  const textFlat = pdf._textFlat ?? normFlat(pdf.text || '');
+  const exNorm = pdf._exInvNorm ?? (pdf.extracted?.invoice_numbers || []).map(x => normFlat(x));
   return tokens.some(t => {
     const tf = normFlat(t);
     if (tf.length < 3) return false;
@@ -510,8 +542,8 @@ function vendorMatched(row, pdf) {
   if (!row.vendor) return null;
   const vTokens = normTokens(row.vendor).filter(t => t.length >= 3);
   if (!vTokens.length) return null;
-  const textFlat = normFlat(pdf.text || '');
-  const exNorm = (pdf.extracted?.vendor_names || []).map(x => normFlat(x));
+  const textFlat = pdf._textFlat ?? normFlat(pdf.text || '');
+  const exNorm = pdf._exVenNorm ?? (pdf.extracted?.vendor_names || []).map(x => normFlat(x));
   const hits = vTokens.filter(t =>
     textFlat.includes(t) || exNorm.some(x => x.includes(t))
   );
@@ -589,10 +621,20 @@ runBtn.addEventListener('click', async () => {
     if (!pdfs.length) throw new Error('ZIP 안에 PDF가 없습니다.');
 
     setProgress(`PDF 텍스트 추출 중... (0/${pdfs.length})`, 15);
-    for (let i = 0; i < pdfs.length; i++) {
-      try { pdfs[i].text = await pdfToText(pdfs[i].blob); }
-      catch (e) { pdfs[i].text = ''; pdfs[i].error = e.message; }
-      setProgress(`PDF 텍스트 추출 중... (${i+1}/${pdfs.length})`, 15 + (i+1) / pdfs.length * 15);
+    {
+      let textDone = 0;
+      const textConcurrency = 6;
+      let textCursor = 0;
+      async function textWorker() {
+        while (textCursor < pdfs.length) {
+          const i = textCursor++;
+          try { pdfs[i].text = await pdfToText(pdfs[i].blob); }
+          catch (e) { pdfs[i].text = ''; pdfs[i].error = e.message; }
+          textDone++;
+          setProgress(`PDF 텍스트 추출 중... (${textDone}/${pdfs.length})`, 15 + textDone / pdfs.length * 15);
+        }
+      }
+      await Promise.all(Array.from({length: textConcurrency}, textWorker));
     }
 
     // PDF별 구조화 추출 (병렬, 동시 6개)
@@ -612,6 +654,17 @@ runBtn.addEventListener('click', async () => {
     await Promise.all(Array.from({length: concurrency}, worker));
 
     setProgress(`금액 매칭 중...`, 90);
+    // PDF 프로필 사전계산 — row마다 재계산되던 normFlat/toLowerCase 결과를 1회만 산출해 캐싱
+    for (const p of pdfs) {
+      p._nameLow  = p.name.toLowerCase();
+      p._nameFlat = normFlat(p.name);
+      const t = p.text || '';
+      p._textLow  = t.toLowerCase();
+      p._textFlat = normFlat(t);
+      const ex = p.extracted || {};
+      p._exInvNorm  = (ex.invoice_numbers || []).map(x => normFlat(x));
+      p._exVenNorm  = (ex.vendor_names || []).map(x => normFlat(x).toLowerCase());
+    }
     const findings = rows.map(row => ({ row, pdf: findPdfForRow(row, pdfs) }));
 
     setProgress('완료', 100);
@@ -626,6 +679,7 @@ runBtn.addEventListener('click', async () => {
 });
 
 function renderResult(findings, pdfs) {
+  lastFindings = findings;   // 내보내기용 저장
   const counts = { OK:0, DUP:0, MISSING:0 };
   findings.forEach(f => {
     let v;
@@ -690,7 +744,14 @@ function renderResult(findings, pdfs) {
 
   result.innerHTML = `
     <section class="card">
-      <div class="head"><h2>STEP 3 · 검토 결과</h2><div class="meta">총 ${findings.length} 행 · DEBIT만 검토</div></div>
+      <div class="head">
+        <h2>STEP 3 · 검토 결과</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="meta">총 ${findings.length} 행 · DEBIT만 검토</span>
+          <button class="btn sm" id="exportXlsxBtn"${findings.length ? '' : ' disabled'}>Excel 내보내기</button>
+          <button class="btn sm" id="exportCsvBtn"${findings.length ? '' : ' disabled'}>CSV 내보내기</button>
+        </div>
+      </div>
       <div class="body">
         <div class="summary">
           <div class="sbox ok"><div class="l">금액 일치</div><div class="v">${counts.OK||0}</div></div>
@@ -698,6 +759,19 @@ function renderResult(findings, pdfs) {
           <div class="sbox err"><div class="l">증빙 미발견</div><div class="v">${counts.MISSING||0}</div></div>
           <div class="sbox"><div class="l">전체 행수</div><div class="v">${findings.length}</div></div>
         </div>
+        ${(()=>{const t=findings.length||1;const pOk=counts.OK/t*100,pWarn=counts.DUP/t*100,pErr=counts.MISSING/t*100;return `<div class="rate">
+          <div class="top"><span class="lbl">검증 성공률 (금액 일치)</span><span class="pct">${(counts.OK/t*100).toFixed(0)}%</span></div>
+          <div class="track">
+            <div class="seg-ok" style="width:${pOk}%"></div>
+            <div class="seg-warn" style="width:${pWarn}%"></div>
+            <div class="seg-err" style="width:${pErr}%"></div>
+          </div>
+          <div class="legend">
+            <span><i class="ok"></i>일치 ${counts.OK||0}</span>
+            <span><i class="warn"></i>중복 검증 ${counts.DUP||0}</span>
+            <span><i class="err"></i>미발견 ${counts.MISSING||0}</span>
+          </div>
+        </div>`;})()}
         ${counts.MISSING ? '<div class="banner warn">증빙 미발견 항목이 있습니다. 관리사에 확인 요청 필요.</div>' : (counts.DUP ? '<div class="banner warn">동일 금액 PDF가 여러 건인 항목은 인보이스/벤더명으로 추가 검증 필요.</div>' : '<div class="banner ok">모든 행이 증빙 금액과 일치합니다.</div>')}
 
         <div class="tableWrap">
@@ -721,6 +795,75 @@ function renderResult(findings, pdfs) {
       </div>
     </section>
   `;
+
+  const xBtn = $('exportXlsxBtn'), cBtn = $('exportCsvBtn');
+  if (xBtn) xBtn.addEventListener('click', () => exportFindings('xlsx'));
+  if (cBtn) cBtn.addEventListener('click', () => exportFindings('csv'));
+}
+
+// ── 내보내기 ──────────────────────────────────────────────
+// findings → 표 형태 행 배열(객체)로 변환 (Excel·CSV 공용)
+function buildExportRows(findings) {
+  return findings.map((f, i) => {
+    const pdf = f.pdf;
+    let verdict;
+    if (!pdf) verdict = '증빙 미발견';
+    else if (pdf._duplicateIndexes && pdf._duplicateIndexes.length) verdict = '중복 검증';
+    else verdict = '일치';
+
+    const okStr = v => v === true ? 'O' : v === false ? 'X' : '-';
+    const dupStr = (pdf?._duplicatePdfs || [])
+      .map(d => `${d.name}(${Math.round((d.score || 0) * 100)}%)`)
+      .join('; ');
+
+    return {
+      '행번호': i + 1,
+      'Invoice No': f.row.invoice || '',
+      'Vendor': f.row.vendor || '',
+      '정산서금액': f.row.debit == null || isNaN(f.row.debit) ? '' : f.row.debit,
+      'CUR': f.row.currency || '',
+      '판정': verdict,
+      '신뢰도%': pdf ? Math.round((pdf._matchScore || 0) * 100) : '',
+      '매칭근거': pdf ? (pdf._matchReasons || []).join(' · ') : '',
+      '매칭 PDF 파일명': pdf ? pdf.name : '',
+      'INV 검증': okStr(pdf?._invoiceOk),
+      'VENDOR 검증': okStr(pdf?._vendorOk),
+      '중복후보': dupStr
+    };
+  });
+}
+
+function exportFindings(type) {
+  const findings = lastFindings;
+  if (!findings || !findings.length) return;
+  const rows = buildExportRows(findings);
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+
+  if (type === 'xlsx') {
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '검토결과');
+    XLSX.writeFile(wb, `정산서검토결과_${stamp}.xlsx`);
+  } else {
+    const headers = Object.keys(rows[0]);
+    const escCsv = v => {
+      const s = String(v ?? '');
+      return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const lines = [headers.map(escCsv).join(',')];
+    for (const r of rows) lines.push(headers.map(h => escCsv(r[h])).join(','));
+    const csv = '﻿' + lines.join('\r\n');   // UTF-8 BOM (한글 깨짐 방지)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `정산서검토결과_${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 }
 
 function esc(s){return String(s??'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);}
